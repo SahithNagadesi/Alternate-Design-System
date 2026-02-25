@@ -1,6 +1,6 @@
 "use client";
 
-import { User, Bot, Copy, Check, Sparkles } from "lucide-react";
+import { User, Copy, Check, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -36,19 +36,19 @@ function CodeBlock({ className, children, ...props }: React.ComponentPropsWithou
   }
 
   return (
-    <div className="group relative my-3 overflow-hidden rounded-lg border border-border/50 bg-muted/30 shadow-sm">
-      <div className="flex items-center justify-between border-b border-border/50 bg-muted/60 px-3 py-1.5">
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">{language || "code"}</span>
+    <div className="group relative my-3 overflow-hidden rounded-xl border border-border/40 bg-muted/20 shadow-sm">
+      <div className="flex items-center justify-between border-b border-border/40 bg-muted/50 px-4 py-2">
+        <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/60">{language || "code"}</span>
         <Button
           variant="ghost"
           size="icon"
-          className="h-6 w-6 opacity-0 transition-opacity group-hover:opacity-100"
+          className="h-6 w-6 rounded-md opacity-0 transition-opacity group-hover:opacity-100"
           onClick={handleCopy}
         >
           {copied ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3" />}
         </Button>
       </div>
-      <pre className="overflow-x-auto p-3">
+      <pre className="overflow-x-auto p-4">
         <code className={cn("text-xs font-mono leading-relaxed", className)} {...props}>
           {children}
         </code>
@@ -65,10 +65,10 @@ export function ChatMessage({ message, isStreaming }: { message: Message; isStre
       {/* Avatar */}
       <div
         className={cn(
-          "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl shadow-sm transition-transform",
+          "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl shadow-sm",
           isUser
             ? "bg-gradient-to-br from-primary to-primary/80 text-primary-foreground"
-            : "border border-border/50 bg-gradient-to-br from-card to-muted text-muted-foreground"
+            : "border border-border/40 bg-gradient-to-br from-card to-muted/80 text-muted-foreground"
         )}
       >
         {isUser ? <User className="h-4 w-4" /> : <Sparkles className="h-4 w-4" />}
@@ -77,10 +77,10 @@ export function ChatMessage({ message, isStreaming }: { message: Message; isStre
       {/* Bubble */}
       <div
         className={cn(
-          "max-w-[80%] rounded-2xl px-4 py-3 shadow-sm transition-shadow",
+          "max-w-[80%] rounded-2xl px-4 py-3 shadow-sm",
           isUser
-            ? "bg-gradient-to-br from-primary to-primary/90 text-primary-foreground rounded-tr-md"
-            : "border border-border/40 bg-card rounded-tl-md",
+            ? "bg-gradient-to-br from-primary to-primary/85 text-primary-foreground rounded-tr-sm"
+            : "border border-border/30 bg-card rounded-tl-sm",
           isStreaming && "streaming-pulse"
         )}
       >
@@ -123,15 +123,15 @@ export function ChatMessage({ message, isStreaming }: { message: Message; isStre
                   <hr className="my-3 border-border/50" />
                 ),
                 table: ({ ...props }) => (
-                  <div className="my-3 overflow-x-auto rounded-lg border border-border/50">
+                  <div className="my-3 overflow-x-auto rounded-xl border border-border/40">
                     <table className="min-w-full border-collapse text-xs" {...props} />
                   </div>
                 ),
                 th: ({ ...props }) => (
-                  <th className="border-b border-border/50 bg-muted/50 px-3 py-1.5 text-left text-[11px] font-semibold uppercase tracking-wider text-muted-foreground" {...props} />
+                  <th className="border-b border-border/40 bg-muted/40 px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wider text-muted-foreground" {...props} />
                 ),
                 td: ({ ...props }) => (
-                  <td className="border-b border-border/30 px-3 py-1.5" {...props} />
+                  <td className="border-b border-border/20 px-3 py-2" {...props} />
                 ),
               }}
             >
@@ -141,8 +141,8 @@ export function ChatMessage({ message, isStreaming }: { message: Message; isStre
         )}
         <p
           className={cn(
-            "mt-1.5 text-[10px] tabular-nums",
-            isUser ? "text-primary-foreground/50" : "text-muted-foreground/50"
+            "mt-2 text-[10px] tabular-nums",
+            isUser ? "text-primary-foreground/40" : "text-muted-foreground/40"
           )}
         >
           {new Date(message.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}

@@ -67,15 +67,33 @@ export default function DashboardPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Projects</h1>
-          <p className="text-muted-foreground">
+          <p className="text-sm text-muted-foreground mt-1">
             Welcome back, {session?.user?.name}
           </p>
         </div>
-        <Button onClick={() => setDialogOpen(true)}>
+        <Button onClick={() => setDialogOpen(true)} className="rounded-xl shadow-md transition-all hover:shadow-lg hover:scale-[1.02] active:scale-[0.98]">
           <Plus className="mr-2 h-4 w-4" />
           New Project
         </Button>
       </div>
+
+      {/* Stats bar */}
+      {projects.length > 0 && (
+        <div className="grid grid-cols-3 gap-3">
+          <div className="rounded-xl border border-border/50 bg-card p-4 shadow-sm">
+            <p className="text-2xl font-bold">{projects.length}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Total Projects</p>
+          </div>
+          <div className="rounded-xl border border-border/50 bg-card p-4 shadow-sm">
+            <p className="text-2xl font-bold text-primary">{componentCount}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Components</p>
+          </div>
+          <div className="rounded-xl border border-border/50 bg-card p-4 shadow-sm">
+            <p className="text-2xl font-bold text-secondary">{appCount}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Applications</p>
+          </div>
+        </div>
+      )}
 
       {/* Search & Filter Bar */}
       {projects.length > 0 && (
@@ -86,10 +104,10 @@ export default function DashboardPage() {
               placeholder="Search projects..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-9"
+              className="pl-9 rounded-xl h-10"
             />
           </div>
-          <div className="flex gap-1">
+          <div className="flex gap-1 rounded-xl border border-border/50 bg-muted/30 p-1">
             {([
               { key: "ALL" as FilterType, label: "All", count: projects.length },
               { key: "COMPONENT" as FilterType, label: "Components", count: componentCount },
@@ -97,14 +115,15 @@ export default function DashboardPage() {
             ]).map((tab) => (
               <Button
                 key={tab.key}
-                variant={filter === tab.key ? "default" : "outline"}
+                variant={filter === tab.key ? "default" : "ghost"}
                 size="sm"
                 onClick={() => setFilter(tab.key)}
+                className={`rounded-lg text-xs ${filter === tab.key ? "shadow-sm" : ""}`}
               >
                 {tab.label}
-                <Badge variant="secondary" className="ml-1.5 px-1.5 py-0 text-xs">
+                <span className="ml-1.5 text-[10px] opacity-70">
                   {tab.count}
-                </Badge>
+                </span>
               </Button>
             ))}
           </div>
@@ -114,7 +133,7 @@ export default function DashboardPage() {
       {loading ? (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {[1, 2, 3].map((i) => (
-            <Card key={i}>
+            <Card key={i} className="rounded-xl">
               <CardHeader>
                 <Skeleton className="h-5 w-32" />
                 <Skeleton className="h-4 w-24" />
@@ -126,16 +145,16 @@ export default function DashboardPage() {
           ))}
         </div>
       ) : projects.length === 0 ? (
-        <Card className="flex flex-col items-center justify-center py-16">
+        <Card className="flex flex-col items-center justify-center py-20 rounded-xl border-dashed border-2 border-border/50">
           <CardContent className="text-center">
-            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-muted">
-              <Component className="h-6 w-6 text-muted-foreground" />
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/10 to-accent/30">
+              <Component className="h-8 w-8 text-primary/60" />
             </div>
             <h3 className="text-lg font-semibold">No projects yet</h3>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Create your first project to get started
+            <p className="mt-1.5 text-sm text-muted-foreground max-w-xs">
+              Create your first Pega component or application to get started
             </p>
-            <Button className="mt-4" onClick={() => setDialogOpen(true)}>
+            <Button className="mt-5 rounded-xl shadow-md" onClick={() => setDialogOpen(true)}>
               <Plus className="mr-2 h-4 w-4" />
               Create Project
             </Button>
@@ -153,17 +172,21 @@ export default function DashboardPage() {
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {filtered.map((project) => (
             <Link key={project.id} href={`/projects/${project.id}`}>
-              <Card className="transition-colors hover:border-primary/50 cursor-pointer h-full">
-                <CardHeader className="pb-3">
+              <Card className="group relative overflow-hidden rounded-xl border-border/50 transition-all duration-200 hover:border-primary/40 hover:shadow-lg hover:-translate-y-0.5 cursor-pointer h-full">
+                <div className="absolute inset-0 bg-gradient-to-br from-primary/[0.02] to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
+                <CardHeader className="relative pb-3">
                   <div className="flex items-center justify-between">
-                    <CardTitle className="text-base">{project.name}</CardTitle>
-                    <Badge variant={project.type === "COMPONENT" ? "default" : "secondary"}>
+                    <CardTitle className="text-base font-semibold">{project.name}</CardTitle>
+                    <Badge
+                      variant={project.type === "COMPONENT" ? "default" : "secondary"}
+                      className="rounded-full text-[10px] font-semibold uppercase tracking-wider px-2.5"
+                    >
                       {project.type === "COMPONENT" ? (
                         <Component className="mr-1 h-3 w-3" />
                       ) : (
                         <AppWindow className="mr-1 h-3 w-3" />
                       )}
-                      {project.type === "COMPONENT" ? "Component" : "Application"}
+                      {project.type === "COMPONENT" ? "Component" : "App"}
                     </Badge>
                   </div>
                   <CardDescription className="flex items-center gap-3 text-xs">
@@ -173,14 +196,14 @@ export default function DashboardPage() {
                     </span>
                     <span className="flex items-center gap-1">
                       <Users className="h-3 w-3" />
-                      {project._count.members} member{project._count.members !== 1 ? "s" : ""}
+                      {project._count.members}
                     </span>
                   </CardDescription>
                 </CardHeader>
-                <CardContent>
-                  <p className="flex items-center gap-1 text-xs text-muted-foreground">
+                <CardContent className="relative">
+                  <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
                     <MessageSquare className="h-3 w-3" />
-                    {project._count.chatMessages} messages
+                    {project._count.chatMessages} message{project._count.chatMessages !== 1 ? "s" : ""}
                   </p>
                 </CardContent>
               </Card>

@@ -4,7 +4,6 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import { Upload, FileText, Trash2, Loader2, FileCode, FileImage, File } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -130,18 +129,19 @@ export function ContextPanel({ projectId }: { projectId: string }) {
   return (
     <div
       className={cn(
-        "flex h-full flex-col rounded-lg border transition-colors",
+        "flex h-full flex-col rounded-xl border border-border/50 bg-card shadow-sm transition-colors",
         dragOver && "border-primary border-dashed bg-primary/5"
       )}
       onDrop={handleDrop}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
     >
-      <div className="flex items-center justify-between border-b p-3">
+      <div className="flex items-center justify-between border-b border-border/40 p-3">
         <h3 className="text-sm font-semibold">Context Documents</h3>
         <Button
           variant="outline"
           size="sm"
+          className="rounded-lg h-7 text-xs"
           onClick={() => fileInputRef.current?.click()}
           disabled={uploading}
         >
@@ -161,23 +161,25 @@ export function ContextPanel({ projectId }: { projectId: string }) {
         />
       </div>
 
-      <ScrollArea className="flex-1">
+      <div className="flex-1 overflow-y-auto">
         {documents.length === 0 ? (
           <div className="flex flex-col items-center justify-center p-6 text-center">
-            <FileText className="mb-2 h-8 w-8 text-muted-foreground" />
+            <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-muted/50">
+              <FileText className="h-6 w-6 text-muted-foreground/60" />
+            </div>
             <p className="text-sm font-medium">No documents yet</p>
-            <p className="mt-1 text-xs text-muted-foreground">
+            <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
               Upload files or drag & drop them here to use as AI context
             </p>
           </div>
         ) : (
-          <div className="space-y-1 p-2">
+          <div className="space-y-0.5 p-2">
             {documents.map((doc) => {
               const Icon = getFileIcon(doc.mimeType);
               return (
                 <div
                   key={doc.id}
-                  className="flex items-center gap-2 rounded-md p-2 hover:bg-muted"
+                  className="flex items-center gap-2 rounded-lg p-2 transition-colors hover:bg-muted/50"
                 >
                   <Switch
                     checked={doc.enabled}
@@ -193,12 +195,12 @@ export function ContextPanel({ projectId }: { projectId: string }) {
                     >
                       {doc.name}
                     </a>
-                    <p className="text-xs text-muted-foreground">{doc.mimeType}</p>
+                    <p className="text-[10px] text-muted-foreground/60">{doc.mimeType}</p>
                   </div>
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-7 w-7 shrink-0"
+                    className="h-7 w-7 shrink-0 rounded-lg text-muted-foreground hover:text-destructive"
                     onClick={() => deleteDocument(doc.id, doc.name)}
                   >
                     <Trash2 className="h-3 w-3" />
@@ -208,10 +210,10 @@ export function ContextPanel({ projectId }: { projectId: string }) {
             })}
           </div>
         )}
-      </ScrollArea>
+      </div>
 
-      <div className="flex items-center justify-between border-t p-2">
-        <p className="text-xs text-muted-foreground">
+      <div className="flex items-center justify-between border-t border-border/40 p-2.5">
+        <p className="text-[11px] text-muted-foreground/60">
           {enabledCount} of {documents.length} enabled
         </p>
         {documents.length > 0 && (
@@ -219,7 +221,7 @@ export function ContextPanel({ projectId }: { projectId: string }) {
             <Button
               variant="ghost"
               size="sm"
-              className="h-6 px-2 text-xs"
+              className="h-6 px-2 text-[11px] rounded-md"
               onClick={() => toggleAll(true)}
               disabled={enabledCount === documents.length}
             >
@@ -228,7 +230,7 @@ export function ContextPanel({ projectId }: { projectId: string }) {
             <Button
               variant="ghost"
               size="sm"
-              className="h-6 px-2 text-xs"
+              className="h-6 px-2 text-[11px] rounded-md"
               onClick={() => toggleAll(false)}
               disabled={enabledCount === 0}
             >

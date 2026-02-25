@@ -68,7 +68,7 @@ export default function ProjectPage({
   if (!project) return null;
 
   return (
-    <div className="flex h-[calc(100vh-6.5rem)] flex-col">
+    <div className="flex h-[calc(100vh-6rem)] flex-col">
       {/* Project Header */}
       <div className="flex items-center justify-between pb-3">
         <div className="flex items-center gap-3">
@@ -125,9 +125,9 @@ export default function ProjectPage({
       </div>
 
       {/* Main Content Area */}
-      <div className="flex flex-1 gap-4 overflow-hidden">
+      <div className="flex flex-1 gap-4 overflow-hidden min-h-0">
         {/* Chat */}
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0 flex flex-col min-h-0">
           <ChatInterface projectId={projectId} includeContext={includeContext} />
         </div>
 

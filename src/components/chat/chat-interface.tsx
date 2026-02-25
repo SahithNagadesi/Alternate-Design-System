@@ -35,6 +35,8 @@ export function ChatInterface({ projectId, includeContext }: ChatInterfaceProps)
     fetchMessages();
   }, [projectId]);
 
+  const isInitialLoad = useRef(true);
+
   useEffect(() => {
     scrollToBottom();
   }, [messages, streamingContent]);
@@ -45,6 +47,8 @@ export function ChatInterface({ projectId, includeContext }: ChatInterfaceProps)
       if (res.ok) {
         const data = await res.json();
         setMessages(data);
+        // Jump to bottom instantly on initial load
+        isInitialLoad.current = true;
       }
     } catch {
       toast.error("Failed to load chat history");
@@ -52,7 +56,15 @@ export function ChatInterface({ projectId, includeContext }: ChatInterfaceProps)
   }
 
   function scrollToBottom() {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    requestAnimationFrame(() => {
+      if (isInitialLoad.current) {
+        // Instant jump on first load
+        scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
+        isInitialLoad.current = false;
+      } else {
+        bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+      }
+    });
   }
 
   const handleSend = useCallback(async () => {
@@ -171,11 +183,11 @@ export function ChatInterface({ projectId, includeContext }: ChatInterfaceProps)
   }
 
   return (
-    <div className="flex h-full flex-col overflow-hidden rounded-xl border border-border/60 bg-card shadow-sm">
+    <div className="flex flex-1 flex-col overflow-hidden rounded-xl border border-border/60 bg-gradient-to-b from-card to-card/80 shadow-lg min-h-0">
       {/* Messages Area — native scrollable div */}
       <div
         ref={scrollRef}
-        className="flex-1 overflow-y-auto scroll-smooth px-4 py-5 sm:px-6"
+        className="flex-1 overflow-y-auto scroll-smooth px-4 py-5 sm:px-6 min-h-0"
       >
         {messages.length === 0 && !sending ? (
           <div className="flex h-full items-center justify-center">

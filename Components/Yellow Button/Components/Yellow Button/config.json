@@ -1,0 +1,52 @@
+{
+  "name": "YellowButton",
+  "label": "Yellow Button - Proceed",
+  "description": "A yellow proceed/action button for Pega Constellation. Designed to be used as a custom DX component within Pega case flows.",
+  "organization": "Custom",
+  "version": "1.0.0",
+  "library": "YellowButton",
+  "type": "Component",
+  "subtype": "Field",
+  "icon": "auto",
+  "properties": [
+    {
+      "name": "label",
+      "label": "Button Label",
+      "format": "TEXT",
+      "defaultValue": "Proceed"
+    },
+    {
+      "name": "disabled",
+      "label": "Disabled",
+      "format": "BOOLEAN",
+      "defaultValue": false
+    },
+    {
+      "name": "size",
+      "label": "Size",
+      "format": "TEXT",
+      "defaultValue": "medium",
+      "allowedValues": ["small", "medium", "large"]
+    },
+    {
+      "name": "variant",
+      "label": "Variant",
+      "format": "TEXT",
+      "defaultValue": "primary",
+      "allowedValues": ["primary", "secondary"]
+    },
+    {
+      "name": "showIcon",
+      "label": "Show Arrow Icon",
+      "format": "BOOLEAN",
+      "defaultValue": true
+    },
+    {
+      "name": "visibility",
+      "label": "Visibility",
+      "format": "BOOLEAN",
+      "defaultValue": true
+    }
+  ],
+  "events": ["onClick"]
+}

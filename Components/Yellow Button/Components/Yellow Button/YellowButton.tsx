@@ -4,7 +4,7 @@
  * Pure React component with zero Pega dependencies.
  * All Pega wiring lives in index.tsx (the bridge).
  *
- * @version 3.0.0
+ * @version 3.1.0
  */
 
 import React, { useState, useCallback, useRef } from "react";

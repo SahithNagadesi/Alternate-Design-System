@@ -4,7 +4,7 @@
  * Pure React component with zero Pega dependencies.
  * All Pega wiring lives in index.tsx (the bridge).
  *
- * @version 2.1.0
+ * @version 2.2.0
  */
 
 import React, { useState, useCallback, useRef } from "react";
@@ -57,7 +57,9 @@ const ArrowIcon: React.FC = () => (
 
 /* ─── Spinner ─── */
 const Spinner: React.FC = () => (
-  <span className={styles.spinner} aria-hidden="true" />
+  <span className={styles.spinner} role="status" aria-label="Loading">
+    <span className={styles.srOnly}>Loading…</span>
+  </span>
 );
 
 /* ─── Component ─── */
@@ -163,7 +165,7 @@ export const YellowButton: React.FC<YellowButtonProps> = ({
         setHovered(false);
         setPressed(false);
       }}
-      onMouseDown={() => setPressed(true)}
+      onMouseDown={() => !isDisabled && setPressed(true)}
       onMouseUp={() => setPressed(false)}
     >
       {/* Ripple */}

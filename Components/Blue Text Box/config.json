@@ -1,0 +1,75 @@
+{
+  "name": "BlueTextBox",
+  "label": "Blue Text Box",
+  "description": "A custom text input field with a blue background, built for Pega Constellation.",
+  "organization": "Custom",
+  "version": "1.0.0",
+  "library": "React",
+  "type": "Field",
+  "subtype": "Text",
+  "icon": "auto",
+  "properties": [
+    {
+      "name": "label",
+      "label": "Field Label",
+      "format": "TEXT",
+      "defaultValue": "Blue Text Box"
+    },
+    {
+      "name": "value",
+      "label": "Value",
+      "format": "TEXT",
+      "defaultValue": ""
+    },
+    {
+      "name": "placeholder",
+      "label": "Placeholder",
+      "format": "TEXT",
+      "defaultValue": "Enter text..."
+    },
+    {
+      "name": "helperText",
+      "label": "Helper Text",
+      "format": "TEXT",
+      "defaultValue": ""
+    },
+    {
+      "name": "required",
+      "label": "Required",
+      "format": "BOOLEAN",
+      "defaultValue": false
+    },
+    {
+      "name": "disabled",
+      "label": "Disabled",
+      "format": "BOOLEAN",
+      "defaultValue": false
+    },
+    {
+      "name": "readOnly",
+      "label": "Read Only",
+      "format": "BOOLEAN",
+      "defaultValue": false
+    },
+    {
+      "name": "hideLabel",
+      "label": "Hide Label",
+      "format": "BOOLEAN",
+      "defaultValue": false
+    },
+    {
+      "name": "testId",
+      "label": "Test ID",
+      "format": "TEXT",
+      "defaultValue": "blue-text-box"
+    }
+  ],
+  "defaultConfig": {
+    "label": "Blue Text Box",
+    "placeholder": "Enter text...",
+    "required": false,
+    "disabled": false,
+    "readOnly": false,
+    "hideLabel": false
+  }
+}

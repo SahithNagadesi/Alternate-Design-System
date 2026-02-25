@@ -1,10 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import { Send, Loader2, Paperclip, X } from "lucide-react";
+import { Send, Loader2, Paperclip, X, Sparkles, MessageSquarePlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { ChatMessage } from "@/components/chat/chat-message";
 import { toast } from "sonner";
@@ -28,6 +27,7 @@ export function ChatInterface({ projectId, includeContext }: ChatInterfaceProps)
   const [streamingContent, setStreamingContent] = useState("");
   const [attachments, setAttachments] = useState<File[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -52,9 +52,7 @@ export function ChatInterface({ projectId, includeContext }: ChatInterfaceProps)
   }
 
   function scrollToBottom() {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }
 
   const handleSend = useCallback(async () => {
@@ -106,7 +104,6 @@ export function ChatInterface({ projectId, includeContext }: ChatInterfaceProps)
       // Handle streaming response
       const reader = res.body?.getReader();
       const decoder = new TextDecoder();
-      let savedUserMessage: Message | null = null;
       let fullContent = "";
 
       if (reader) {
@@ -125,7 +122,6 @@ export function ChatInterface({ projectId, includeContext }: ChatInterfaceProps)
               const data = JSON.parse(line.slice(6));
 
               if (data.type === "user_message") {
-                savedUserMessage = data.message;
                 // Replace temp message with saved one
                 setMessages((prev) =>
                   prev.map((m) => (m.id === tempId ? data.message : m))
@@ -175,20 +171,38 @@ export function ChatInterface({ projectId, includeContext }: ChatInterfaceProps)
   }
 
   return (
-    <div className="flex h-full flex-col rounded-lg border bg-card">
-      {/* Messages Area */}
-      <ScrollArea className="flex-1 p-4" ref={scrollRef}>
+    <div className="flex h-full flex-col overflow-hidden rounded-xl border border-border/60 bg-card shadow-sm">
+      {/* Messages Area — native scrollable div */}
+      <div
+        ref={scrollRef}
+        className="flex-1 overflow-y-auto scroll-smooth px-4 py-5 sm:px-6"
+      >
         {messages.length === 0 && !sending ? (
           <div className="flex h-full items-center justify-center">
-            <div className="text-center">
-              <h3 className="text-lg font-semibold">Start a conversation</h3>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Describe the Pega component or application you want to build
+            <div className="chat-fade-in text-center max-w-md mx-auto">
+              <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/10 to-accent/40 shadow-inner">
+                <MessageSquarePlus className="h-8 w-8 text-primary" />
+              </div>
+              <h3 className="text-xl font-semibold tracking-tight">Start a conversation</h3>
+              <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
+                Describe the Pega component or application you want to build.
+                Attach files for context or enable project documents.
               </p>
+              <div className="mt-5 flex flex-wrap justify-center gap-2">
+                {["Create a DX API form", "Build a data table", "Design a dashboard"].map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => setInput(s)}
+                    className="rounded-full border border-border/80 bg-muted/50 px-3.5 py-1.5 text-xs font-medium text-muted-foreground transition-all hover:border-primary/40 hover:bg-accent/50 hover:text-foreground"
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-5">
             {messages.map((message) => (
               <ChatMessage key={message.id} message={message} />
             ))}
@@ -201,27 +215,33 @@ export function ChatInterface({ projectId, includeContext }: ChatInterfaceProps)
                   content: streamingContent,
                   createdAt: new Date().toISOString(),
                 }}
+                isStreaming
               />
             )}
             {sending && !streamingContent && (
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                <span className="text-sm">Thinking...</span>
+              <div className="chat-fade-in flex items-center gap-3 pl-12">
+                <div className="flex items-center gap-1.5 rounded-xl bg-muted/70 px-4 py-3">
+                  <span className="typing-dot h-2 w-2 rounded-full bg-primary/60" />
+                  <span className="typing-dot h-2 w-2 rounded-full bg-primary/60" style={{ animationDelay: "0.15s" }} />
+                  <span className="typing-dot h-2 w-2 rounded-full bg-primary/60" style={{ animationDelay: "0.3s" }} />
+                </div>
               </div>
             )}
+            <div ref={bottomRef} />
           </div>
         )}
-      </ScrollArea>
+      </div>
 
       {/* Attachments Preview */}
       {attachments.length > 0 && (
-        <div className="flex flex-wrap gap-2 border-t px-4 py-2">
+        <div className="flex flex-wrap gap-2 border-t border-border/50 bg-muted/30 px-4 py-2.5">
           {attachments.map((file, i) => (
-            <Badge key={i} variant="secondary" className="gap-1 pr-1">
+            <Badge key={i} variant="secondary" className="gap-1.5 pr-1 rounded-full">
+              <Paperclip className="h-3 w-3 opacity-50" />
               {file.name}
               <button
                 onClick={() => removeAttachment(i)}
-                className="ml-1 rounded-full p-0.5 hover:bg-muted-foreground/20"
+                className="ml-0.5 rounded-full p-0.5 transition-colors hover:bg-destructive/20 hover:text-destructive"
               >
                 <X className="h-3 w-3" />
               </button>
@@ -231,12 +251,12 @@ export function ChatInterface({ projectId, includeContext }: ChatInterfaceProps)
       )}
 
       {/* Input Area */}
-      <div className="border-t p-4">
-        <div className="flex gap-2">
+      <div className="border-t border-border/50 bg-card p-3 sm:p-4">
+        <div className="flex items-end gap-2">
           <Button
-            variant="outline"
+            variant="ghost"
             size="icon"
-            className="shrink-0"
+            className="shrink-0 rounded-full h-10 w-10 text-muted-foreground hover:text-foreground hover:bg-muted"
             onClick={() => fileInputRef.current?.click()}
             disabled={sending}
           >
@@ -249,34 +269,49 @@ export function ChatInterface({ projectId, includeContext }: ChatInterfaceProps)
             multiple
             onChange={handleFileSelect}
           />
-          <Textarea
-            ref={textareaRef}
-            placeholder="Describe what you want to build..."
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            rows={2}
-            className="min-h-[60px] resize-none"
-            disabled={sending}
-          />
-          <Button
-            onClick={handleSend}
-            disabled={!input.trim() || sending}
-            size="icon"
-            className="h-auto shrink-0"
-          >
-            {sending ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Send className="h-4 w-4" />
-            )}
-          </Button>
+          <div className="relative flex-1">
+            <Textarea
+              ref={textareaRef}
+              placeholder="Describe what you want to build..."
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              rows={1}
+              className="min-h-[44px] max-h-[160px] resize-none rounded-xl border-border/60 bg-muted/30 pr-12 text-sm transition-colors focus:bg-background"
+              disabled={sending}
+            />
+            <Button
+              onClick={handleSend}
+              disabled={!input.trim() || sending}
+              size="icon"
+              className="absolute right-1.5 bottom-1.5 h-8 w-8 rounded-lg shadow-sm transition-transform hover:scale-105 active:scale-95"
+            >
+              {sending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Send className="h-4 w-4" />
+              )}
+            </Button>
+          </div>
         </div>
-        <p className="mt-2 text-xs text-muted-foreground">
-          Press Enter to send, Shift+Enter for new line
-          {includeContext && " · Context documents included"}
-          {attachments.length > 0 && ` · ${attachments.length} file(s) attached`}
-        </p>
+        <div className="mt-2 flex items-center justify-between px-1">
+          <p className="text-[11px] text-muted-foreground/70">
+            Enter to send &middot; Shift+Enter for new line
+          </p>
+          <div className="flex items-center gap-2">
+            {attachments.length > 0 && (
+              <span className="text-[11px] text-muted-foreground/70">
+                {attachments.length} file{attachments.length > 1 ? "s" : ""} attached
+              </span>
+            )}
+            {includeContext && (
+              <span className="inline-flex items-center gap-1 text-[11px] text-primary/70">
+                <Sparkles className="h-3 w-3" />
+                Context on
+              </span>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );

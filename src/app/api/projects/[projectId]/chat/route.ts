@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { checkRateLimit } from "@/lib/rate-limit";
-import { getAnthropicApiKey } from "@/lib/get-api-key";
+import { getAnthropicApiKey, getAnthropicBaseUrl, getAnthropicModel } from "@/lib/get-api-key";
 import Anthropic from "@anthropic-ai/sdk";
 
 const SYSTEM_PROMPT = `You are Frontier XD, an AI assistant specialized in creating Pega UI components and Alternate Design Systems.
@@ -154,15 +154,34 @@ export async function POST(
     ? `\nProject: "${project.name}" (${project.type === "COMPONENT" ? "Custom Component" : "Alternate Design System"})\nFolder: ${project.folderPath}`
     : "";
 
-  // Get API key dynamically (DB first, then env var)
-  const apiKey = await getAnthropicApiKey();
+  // Get API key and config dynamically (DB first, then env var)
+  let apiKey: string | null;
+  let baseURL: string | undefined;
+  let model: string;
+  try {
+    [apiKey, baseURL, model] = await Promise.all([
+      getAnthropicApiKey(),
+      getAnthropicBaseUrl(),
+      getAnthropicModel(),
+    ]);
+  } catch (err) {
+    console.error("Failed to retrieve Anthropic settings:", err);
+    const message = err instanceof Error ? err.message : String(err);
+    return NextResponse.json(
+      { error: `Failed to read API settings: ${message}. Please check Admin Settings or ENCRYPTION_KEY.` },
+      { status: 500 }
+    );
+  }
   if (!apiKey) {
     return NextResponse.json(
       { error: "Anthropic API key is not configured. Please ask an admin to set it in Settings." },
       { status: 503 }
     );
   }
-  const anthropic = new Anthropic({ apiKey });
+  const anthropic = new Anthropic({
+    apiKey,
+    ...(baseURL ? { baseURL } : {}),
+  });
 
   try {
     // Stream the response
@@ -178,7 +197,7 @@ export async function POST(
           );
 
           const response = anthropic.messages.stream({
-            model: "claude-sonnet-4-20250514",
+            model,
             max_tokens: 4096,
             system: SYSTEM_PROMPT + projectContext,
             messages,
@@ -205,10 +224,27 @@ export async function POST(
           controller.enqueue(
             encoder.encode(`data: ${JSON.stringify({ type: "done", message: assistantMessage })}\n\n`)
           );
-        } catch (err) {
+        } catch (err: unknown) {
           console.error("Claude API streaming error:", err);
+
+          // Surface specific error types from the Anthropic SDK
+          let errorMsg = "Failed to get AI response";
+          if (err instanceof Anthropic.AuthenticationError) {
+            errorMsg = "Invalid Anthropic API key. Please check the key in Admin Settings.";
+          } else if (err instanceof Anthropic.RateLimitError) {
+            errorMsg = "Anthropic API rate limit reached. Please wait a moment and try again.";
+          } else if (err instanceof Anthropic.NotFoundError) {
+            errorMsg = "AI model not found. The configured model may be unavailable.";
+          } else if (err instanceof Anthropic.PermissionDeniedError) {
+            errorMsg = "Anthropic API permission denied. The API key may lack required access.";
+          } else if (err instanceof Anthropic.APIError) {
+            errorMsg = `Anthropic API error (${err.status}): ${err.message}`;
+          } else if (err instanceof Error) {
+            errorMsg = `AI error: ${err.message}`;
+          }
+
           controller.enqueue(
-            encoder.encode(`data: ${JSON.stringify({ type: "error", error: "Failed to get AI response" })}\n\n`)
+            encoder.encode(`data: ${JSON.stringify({ type: "error", error: errorMsg })}\n\n`)
           );
         } finally {
           controller.close();

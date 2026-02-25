@@ -3,9 +3,17 @@ import crypto from "crypto";
 const ALGORITHM = "aes-256-gcm";
 
 function getKey(): Buffer {
-  const key = process.env.ENCRYPTION_KEY;
-  if (!key || key.length !== 64) {
-    throw new Error("ENCRYPTION_KEY must be a 64-character hex string (32 bytes)");
+  const raw = process.env.ENCRYPTION_KEY;
+  if (!raw) {
+    throw new Error("ENCRYPTION_KEY environment variable is not set");
+  }
+  // Strip quotes, literal \n, and whitespace that may have been accidentally included
+  const key = raw.replace(/\\n/g, "").replace(/^["']|["']$/g, "").trim();
+  if (key.length !== 64 || !/^[0-9a-fA-F]+$/.test(key)) {
+    throw new Error(
+      `ENCRYPTION_KEY must be exactly 64 hex characters (got ${key.length} chars). ` +
+      `Generate one with: openssl rand -hex 32`
+    );
   }
   return Buffer.from(key, "hex");
 }

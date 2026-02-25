@@ -1,10 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
@@ -21,6 +20,21 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
+import { Github, FolderGit2, Loader2, RefreshCw } from "lucide-react";
+
+interface GitHubRepo {
+  fullName: string;
+  name: string;
+  owner: string;
+  private: boolean;
+  defaultBranch: string;
+  url: string;
+}
+
+interface GitHubFolder {
+  name: string;
+  path: string;
+}
 
 interface CreateProjectDialogProps {
   open: boolean;
@@ -40,6 +54,84 @@ export function CreateProjectDialog({
   const [pegaPassword, setPegaPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
+  // GitHub state
+  const [repos, setRepos] = useState<GitHubRepo[]>([]);
+  const [selectedRepo, setSelectedRepo] = useState("");
+  const [folders, setFolders] = useState<GitHubFolder[]>([]);
+  const [selectedFolder, setSelectedFolder] = useState("");
+  const [loadingRepos, setLoadingRepos] = useState(false);
+  const [loadingFolders, setLoadingFolders] = useState(false);
+  const [githubAvailable, setGithubAvailable] = useState<boolean | null>(null);
+  const [githubError, setGithubError] = useState<string | null>(null);
+
+  // Fetch repos when dialog opens
+  useEffect(() => {
+    if (open) {
+      fetchRepos();
+    } else {
+      // Reset state when dialog closes
+      setRepos([]);
+      setSelectedRepo("");
+      setFolders([]);
+      setSelectedFolder("");
+      setGithubAvailable(null);
+      setGithubError(null);
+    }
+  }, [open]);
+
+  // Fetch folders when repo changes
+  useEffect(() => {
+    if (selectedRepo) {
+      fetchFolders(selectedRepo, "");
+    } else {
+      setFolders([]);
+      setSelectedFolder("");
+    }
+  }, [selectedRepo]);
+
+  async function fetchRepos() {
+    setLoadingRepos(true);
+    setGithubError(null);
+    try {
+      const res = await fetch("/api/github/repos");
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        const msg = data.error || `GitHub API error (${res.status})`;
+        setGithubError(msg);
+        setGithubAvailable(false);
+        return;
+      }
+      const data = await res.json();
+      setRepos(data);
+      setGithubAvailable(true);
+    } catch {
+      setGithubError("Failed to connect to GitHub API");
+      setGithubAvailable(false);
+    } finally {
+      setLoadingRepos(false);
+    }
+  }
+
+  async function fetchFolders(repo: string, path: string) {
+    setLoadingFolders(true);
+    try {
+      const params = new URLSearchParams({ repo });
+      if (path) params.set("path", path);
+      const res = await fetch(`/api/github/folders?${params.toString()}`);
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Failed to fetch folders");
+      }
+      const data = await res.json();
+      setFolders(data);
+    } catch (err) {
+      console.error("Failed to fetch folders:", err);
+      setFolders([]);
+    } finally {
+      setLoadingFolders(false);
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim()) return;
@@ -55,6 +147,8 @@ export function CreateProjectDialog({
           pegaServerUrl: pegaServerUrl.trim() || undefined,
           pegaUsername: pegaUsername.trim() || undefined,
           pegaPassword: pegaPassword.trim() || undefined,
+          githubRepo: selectedRepo || undefined,
+          githubFolder: selectedFolder || undefined,
         }),
       });
 
@@ -69,6 +163,8 @@ export function CreateProjectDialog({
       setPegaServerUrl("");
       setPegaUsername("");
       setPegaPassword("");
+      setSelectedRepo("");
+      setSelectedFolder("");
       onCreated();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to create project");
@@ -79,7 +175,7 @@ export function CreateProjectDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Create New Project</DialogTitle>
           <DialogDescription>
@@ -114,6 +210,114 @@ export function CreateProjectDialog({
                 ? "A Pega UI component publishable to a Pega server"
                 : "A full application using Pega as backend via DX APIs"}
             </p>
+          </div>
+
+          {/* GitHub Repository Section */}
+          <div className="space-y-3 rounded-md border p-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Github className="h-4 w-4 text-muted-foreground" />
+                <p className="text-sm font-medium">GitHub Repository (optional)</p>
+              </div>
+              {githubAvailable && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={fetchRepos}
+                  disabled={loadingRepos}
+                >
+                  <RefreshCw className={`h-3 w-3 ${loadingRepos ? "animate-spin" : ""}`} />
+                </Button>
+              )}
+            </div>
+
+            {githubAvailable === false && (
+              <p className="text-xs text-destructive">
+                {githubError || "GitHub PAT not configured. Ask an admin to set it in Settings to enable repo selection."}
+              </p>
+            )}
+
+            {githubAvailable === null && loadingRepos && (
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                Loading repositories...
+              </div>
+            )}
+
+            {githubAvailable && (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="github-repo">Repository</Label>
+                  <Select value={selectedRepo} onValueChange={setSelectedRepo}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a repository" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {repos.map((repo) => (
+                        <SelectItem key={repo.fullName} value={repo.fullName}>
+                          <div className="flex items-center gap-2">
+                            <FolderGit2 className="h-3 w-3" />
+                            {repo.fullName}
+                            {repo.private && (
+                              <span className="text-xs text-muted-foreground">(private)</span>
+                            )}
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {selectedRepo && (
+                  <div className="space-y-2">
+                    <Label htmlFor="github-folder">Folder (optional)</Label>
+                    {loadingFolders ? (
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground py-2">
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                        Loading folders...
+                      </div>
+                    ) : (
+                      <Select
+                        value={selectedFolder || "__ROOT__"}
+                        onValueChange={(v) => {
+                          const actualValue = v === "__ROOT__" ? "" : v;
+                          setSelectedFolder(actualValue);
+                          // Fetch subfolders for the selected path
+                          fetchFolders(selectedRepo, actualValue);
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Root (or select a folder)" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {selectedFolder && (
+                            <SelectItem value="__ROOT__">
+                              .. (root)
+                            </SelectItem>
+                          )}
+                          {folders.map((folder) => (
+                            <SelectItem key={folder.path} value={folder.path}>
+                              {folder.name}/
+                            </SelectItem>
+                          ))}
+                          {folders.length === 0 && (
+                            <div className="px-2 py-1.5 text-xs text-muted-foreground">
+                              No subfolders found
+                            </div>
+                          )}
+                        </SelectContent>
+                      </Select>
+                    )}
+                    {selectedFolder && (
+                      <p className="text-xs text-muted-foreground">
+                        Project will be stored at: <code>{selectedFolder}/{name.replace(/[^a-zA-Z0-9-_ ]/g, "").trim() || "..."}</code>
+                      </p>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
           </div>
 
           <div className="space-y-3 rounded-md border p-3">

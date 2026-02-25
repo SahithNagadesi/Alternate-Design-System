@@ -46,6 +46,8 @@ model Project {
   pegaServerUrl   String?
   pegaCredentials String?
   folderPath      String
+  githubRepo      String?
+  githubFolder    String?
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
 

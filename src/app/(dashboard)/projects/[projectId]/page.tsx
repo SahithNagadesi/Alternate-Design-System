@@ -2,7 +2,7 @@
 
 import { useEffect, useState, use } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Settings, FolderOpen } from "lucide-react";
+import { ArrowLeft, Settings, FolderOpen, BookOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ChatInterface } from "@/components/chat/chat-interface";
@@ -57,7 +57,10 @@ export default function ProjectPage({
   if (loading) {
     return (
       <div className="flex h-full items-center justify-center">
-        <div className="animate-pulse text-muted-foreground">Loading project...</div>
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+          <span className="text-sm text-muted-foreground">Loading project...</span>
+        </div>
       </div>
     );
   }
@@ -65,55 +68,72 @@ export default function ProjectPage({
   if (!project) return null;
 
   return (
-    <div className="flex h-[calc(100vh-7.5rem)] flex-col">
+    <div className="flex h-[calc(100vh-6.5rem)] flex-col">
       {/* Project Header */}
-      <div className="flex items-center justify-between border-b pb-4">
+      <div className="flex items-center justify-between pb-3">
         <div className="flex items-center gap-3">
           <Link href="/dashboard">
-            <Button variant="ghost" size="icon">
+            <Button variant="ghost" size="icon" className="rounded-xl h-9 w-9">
               <ArrowLeft className="h-4 w-4" />
             </Button>
           </Link>
           <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-lg font-semibold">{project.name}</h1>
-              <Badge variant={project.type === "COMPONENT" ? "default" : "secondary"}>
+            <div className="flex items-center gap-2.5">
+              <h1 className="text-lg font-bold tracking-tight">{project.name}</h1>
+              <Badge
+                variant={project.type === "COMPONENT" ? "default" : "secondary"}
+                className="rounded-full text-[10px] font-semibold uppercase tracking-wider px-2.5"
+              >
                 {project.type === "COMPONENT" ? "Component" : "Application"}
               </Badge>
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground/70 mt-0.5">
               {project.folderPath}
-              {project.pegaServerUrl && ` · ${project.pegaServerUrl}`}
+              {project.pegaServerUrl && (
+                <span className="before:content-['_·_']">{project.pegaServerUrl}</span>
+              )}
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           <Button
             variant={includeContext ? "default" : "outline"}
             size="sm"
+            className="rounded-lg gap-1.5 text-xs font-medium h-8"
             onClick={() => setIncludeContext(!includeContext)}
           >
-            Include Context
+            <BookOpen className="h-3.5 w-3.5" />
+            Context
           </Button>
-          <Button variant="outline" size="icon" onClick={() => setContextOpen(!contextOpen)}>
-            <FolderOpen className="h-4 w-4" />
+          <Button
+            variant="outline"
+            size="icon"
+            className="rounded-lg h-8 w-8"
+            onClick={() => setContextOpen(!contextOpen)}
+          >
+            <FolderOpen className="h-3.5 w-3.5" />
           </Button>
-          <Button variant="outline" size="icon" onClick={() => setSettingsOpen(true)}>
-            <Settings className="h-4 w-4" />
+          <Button
+            variant="outline"
+            size="icon"
+            className="rounded-lg h-8 w-8"
+            onClick={() => setSettingsOpen(true)}
+          >
+            <Settings className="h-3.5 w-3.5" />
           </Button>
         </div>
       </div>
 
       {/* Main Content Area */}
-      <div className="flex flex-1 overflow-hidden pt-4">
+      <div className="flex flex-1 gap-4 overflow-hidden">
         {/* Chat */}
-        <div className={`flex-1 ${contextOpen ? "mr-4" : ""}`}>
+        <div className="flex-1 min-w-0">
           <ChatInterface projectId={projectId} includeContext={includeContext} />
         </div>
 
         {/* Context Panel */}
         {contextOpen && (
-          <div className="w-80 shrink-0">
+          <div className="w-80 shrink-0 chat-fade-in">
             <ContextPanel projectId={projectId} />
           </div>
         )}

@@ -1,6 +1,6 @@
 "use client";
 
-import { User, Bot, Copy, Check } from "lucide-react";
+import { User, Bot, Copy, Check, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -21,7 +21,7 @@ function CodeBlock({ className, children, ...props }: React.ComponentPropsWithou
 
   if (isInline) {
     return (
-      <code className="rounded bg-muted px-1.5 py-0.5 text-xs font-mono" {...props}>
+      <code className="rounded-md bg-primary/8 px-1.5 py-0.5 text-xs font-mono text-primary/90 dark:bg-primary/15" {...props}>
         {children}
       </code>
     );
@@ -36,20 +36,20 @@ function CodeBlock({ className, children, ...props }: React.ComponentPropsWithou
   }
 
   return (
-    <div className="group relative my-3 overflow-hidden rounded-md border bg-muted/50">
-      <div className="flex items-center justify-between border-b bg-muted px-3 py-1.5">
-        <span className="text-xs font-medium text-muted-foreground">{language || "code"}</span>
+    <div className="group relative my-3 overflow-hidden rounded-lg border border-border/50 bg-muted/30 shadow-sm">
+      <div className="flex items-center justify-between border-b border-border/50 bg-muted/60 px-3 py-1.5">
+        <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">{language || "code"}</span>
         <Button
           variant="ghost"
           size="icon"
-          className="h-6 w-6"
+          className="h-6 w-6 opacity-0 transition-opacity group-hover:opacity-100"
           onClick={handleCopy}
         >
-          {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+          {copied ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3" />}
         </Button>
       </div>
       <pre className="overflow-x-auto p-3">
-        <code className={cn("text-xs font-mono", className)} {...props}>
+        <code className={cn("text-xs font-mono leading-relaxed", className)} {...props}>
           {children}
         </code>
       </pre>
@@ -57,48 +57,81 @@ function CodeBlock({ className, children, ...props }: React.ComponentPropsWithou
   );
 }
 
-export function ChatMessage({ message }: { message: Message }) {
+export function ChatMessage({ message, isStreaming }: { message: Message; isStreaming?: boolean }) {
   const isUser = message.role === "USER";
 
   return (
-    <div className={cn("flex gap-3", isUser && "flex-row-reverse")}>
+    <div className={cn("chat-fade-in flex gap-3", isUser && "flex-row-reverse")}>
+      {/* Avatar */}
       <div
         className={cn(
-          "flex h-8 w-8 shrink-0 items-center justify-center rounded-full",
-          isUser ? "bg-primary text-primary-foreground" : "bg-muted"
+          "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl shadow-sm transition-transform",
+          isUser
+            ? "bg-gradient-to-br from-primary to-primary/80 text-primary-foreground"
+            : "border border-border/50 bg-gradient-to-br from-card to-muted text-muted-foreground"
         )}
       >
-        {isUser ? <User className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
+        {isUser ? <User className="h-4 w-4" /> : <Sparkles className="h-4 w-4" />}
       </div>
+
+      {/* Bubble */}
       <div
         className={cn(
-          "max-w-[80%] rounded-lg px-4 py-2",
+          "max-w-[80%] rounded-2xl px-4 py-3 shadow-sm transition-shadow",
           isUser
-            ? "bg-primary text-primary-foreground"
-            : "bg-muted"
+            ? "bg-gradient-to-br from-primary to-primary/90 text-primary-foreground rounded-tr-md"
+            : "border border-border/40 bg-card rounded-tl-md",
+          isStreaming && "streaming-pulse"
         )}
       >
         {isUser ? (
-          <div className="whitespace-pre-wrap text-sm">{message.content}</div>
+          <div className="whitespace-pre-wrap text-sm leading-relaxed">{message.content}</div>
         ) : (
-          <div className="prose prose-sm dark:prose-invert max-w-none text-sm [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
+          <div className="prose prose-sm dark:prose-invert max-w-none text-sm leading-relaxed [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
             <ReactMarkdown
               remarkPlugins={[remarkGfm]}
               components={{
                 code: CodeBlock,
                 a: ({ ...props }) => (
-                  <a {...props} target="_blank" rel="noopener noreferrer" className="text-primary underline" />
+                  <a {...props} target="_blank" rel="noopener noreferrer" className="font-medium text-primary underline decoration-primary/30 underline-offset-2 transition-colors hover:decoration-primary" />
+                ),
+                p: ({ ...props }) => (
+                  <p className="mb-2.5 last:mb-0 leading-relaxed" {...props} />
+                ),
+                ul: ({ ...props }) => (
+                  <ul className="mb-2.5 ml-1 list-disc space-y-1 pl-4" {...props} />
+                ),
+                ol: ({ ...props }) => (
+                  <ol className="mb-2.5 ml-1 list-decimal space-y-1 pl-4" {...props} />
+                ),
+                li: ({ ...props }) => (
+                  <li className="leading-relaxed" {...props} />
+                ),
+                h1: ({ ...props }) => (
+                  <h1 className="mb-3 mt-4 text-lg font-bold first:mt-0" {...props} />
+                ),
+                h2: ({ ...props }) => (
+                  <h2 className="mb-2.5 mt-3.5 text-base font-bold first:mt-0" {...props} />
+                ),
+                h3: ({ ...props }) => (
+                  <h3 className="mb-2 mt-3 text-sm font-bold first:mt-0" {...props} />
+                ),
+                blockquote: ({ ...props }) => (
+                  <blockquote className="my-2 border-l-2 border-primary/30 pl-3 italic text-muted-foreground" {...props} />
+                ),
+                hr: () => (
+                  <hr className="my-3 border-border/50" />
                 ),
                 table: ({ ...props }) => (
-                  <div className="my-2 overflow-x-auto">
+                  <div className="my-3 overflow-x-auto rounded-lg border border-border/50">
                     <table className="min-w-full border-collapse text-xs" {...props} />
                   </div>
                 ),
                 th: ({ ...props }) => (
-                  <th className="border border-border bg-muted px-2 py-1 text-left font-medium" {...props} />
+                  <th className="border-b border-border/50 bg-muted/50 px-3 py-1.5 text-left text-[11px] font-semibold uppercase tracking-wider text-muted-foreground" {...props} />
                 ),
                 td: ({ ...props }) => (
-                  <td className="border border-border px-2 py-1" {...props} />
+                  <td className="border-b border-border/30 px-3 py-1.5" {...props} />
                 ),
               }}
             >
@@ -108,11 +141,11 @@ export function ChatMessage({ message }: { message: Message }) {
         )}
         <p
           className={cn(
-            "mt-1 text-xs",
-            isUser ? "text-primary-foreground/70" : "text-muted-foreground"
+            "mt-1.5 text-[10px] tabular-nums",
+            isUser ? "text-primary-foreground/50" : "text-muted-foreground/50"
           )}
         >
-          {new Date(message.createdAt).toLocaleTimeString()}
+          {new Date(message.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
         </p>
       </div>
     </div>

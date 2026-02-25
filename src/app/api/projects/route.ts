@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json();
-  const { name, type, pegaServerUrl, pegaUsername, pegaPassword } = body;
+  const { name, type, pegaServerUrl, pegaUsername, pegaPassword, githubRepo, githubFolder } = body;
 
   if (!name || !type) {
     return NextResponse.json({ error: "Name and type are required" }, { status: 400 });
@@ -49,7 +49,9 @@ export async function POST(req: NextRequest) {
   // Build folder path based on type
   const folder = type === "COMPONENT" ? "Components" : "Applications";
   const safeName = name.replace(/[^a-zA-Z0-9-_ ]/g, "").trim();
-  const folderPath = `${folder}/${safeName}`;
+  const folderPath = githubFolder
+    ? `${githubFolder}/${safeName}`
+    : `${folder}/${safeName}`;
 
   // Encrypt Pega credentials if provided
   let encryptedCreds: string | undefined;
@@ -64,6 +66,8 @@ export async function POST(req: NextRequest) {
       folderPath,
       pegaServerUrl: pegaServerUrl || null,
       pegaCredentials: encryptedCreds || null,
+      githubRepo: githubRepo || null,
+      githubFolder: githubFolder || null,
       members: {
         create: {
           userId: session.user.id,

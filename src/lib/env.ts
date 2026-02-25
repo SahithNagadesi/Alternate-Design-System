@@ -15,20 +15,22 @@ export function validateEnv() {
   const requiredVars = [
     "DATABASE_URL",
     "NEXTAUTH_SECRET",
-    "ANTHROPIC_API_KEY",
     "ENCRYPTION_KEY",
   ];
 
   for (const name of requiredVars) {
-    if (!process.env[name]) {
+    if (!process.env[name]?.trim()) {
       errors.push(name);
     }
   }
 
-  // ENCRYPTION_KEY must be exactly 64 hex chars
-  const encKey = process.env.ENCRYPTION_KEY;
-  if (encKey && (encKey.length !== 64 || !/^[0-9a-fA-F]+$/.test(encKey))) {
-    errors.push("ENCRYPTION_KEY (must be 64 hex characters)");
+  // ENCRYPTION_KEY must be exactly 64 hex chars (after cleaning)
+  const encKeyRaw = process.env.ENCRYPTION_KEY;
+  if (encKeyRaw) {
+    const encKey = encKeyRaw.replace(/\\n/g, "").replace(/^["']|["']$/g, "").trim();
+    if (encKey.length !== 64 || !/^[0-9a-fA-F]+$/.test(encKey)) {
+      errors.push("ENCRYPTION_KEY (must be 64 hex characters)");
+    }
   }
 
   if (errors.length > 0) {
@@ -49,7 +51,7 @@ export const env = {
     return process.env.NEXTAUTH_URL || "http://localhost:3000";
   },
   get ANTHROPIC_API_KEY() {
-    return required("ANTHROPIC_API_KEY");
+    return process.env.ANTHROPIC_API_KEY?.trim() || "";
   },
   get BLOB_READ_WRITE_TOKEN() {
     return process.env.BLOB_READ_WRITE_TOKEN || "";

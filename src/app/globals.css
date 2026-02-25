@@ -138,3 +138,73 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Chat animations */
+@keyframes chat-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes typing-bounce {
+  0%, 60%, 100% {
+    transform: translateY(0);
+    opacity: 0.4;
+  }
+  30% {
+    transform: translateY(-4px);
+    opacity: 1;
+  }
+}
+
+@keyframes streaming-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 oklch(0.60 0.18 24 / 0);
+  }
+  50% {
+    box-shadow: 0 0 0 3px oklch(0.60 0.18 24 / 0.08);
+  }
+}
+
+.chat-fade-in {
+  animation: chat-fade-in 0.3s ease-out;
+}
+
+.typing-dot {
+  animation: typing-bounce 1.2s ease-in-out infinite;
+}
+
+.streaming-pulse {
+  animation: streaming-pulse 2s ease-in-out infinite;
+}
+
+/* Custom scrollbar for chat */
+.overflow-y-auto::-webkit-scrollbar {
+  width: 6px;
+}
+
+.overflow-y-auto::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.overflow-y-auto::-webkit-scrollbar-thumb {
+  background: oklch(0.75 0.01 230);
+  border-radius: 3px;
+}
+
+.overflow-y-auto::-webkit-scrollbar-thumb:hover {
+  background: oklch(0.65 0.01 230);
+}
+
+.dark .overflow-y-auto::-webkit-scrollbar-thumb {
+  background: oklch(0.35 0.02 240);
+}
+
+.dark .overflow-y-auto::-webkit-scrollbar-thumb:hover {
+  background: oklch(0.45 0.02 240);
+}

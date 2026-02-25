@@ -1,11 +1,18 @@
 import styled, { css } from "styled-components";
 
+/**
+ * Blue Text Box — Styled Wrapper
+ *
+ * Provides a vibrant blue (#1A73E8) background for the text input
+ * with white text, custom focus/hover/disabled/error states.
+ */
 const StyledBlueTextBoxWrapper = styled.div(() => {
   return css`
-    /* ===== Blue Text Box Styles ===== */
+    /* ===== Container ===== */
     margin: 0.5rem 0;
+    position: relative;
 
-    /* Blue background for the input field */
+    /* ===== Blue Background Input ===== */
     input[type="text"] {
       background-color: #1a73e8 !important;
       color: #ffffff !important;
@@ -13,17 +20,22 @@ const StyledBlueTextBoxWrapper = styled.div(() => {
       border-radius: 8px;
       padding: 0.625rem 0.875rem;
       font-size: 1rem;
+      font-family: inherit;
       line-height: 1.5;
-      transition: all 0.2s ease-in-out;
+      width: 100%;
+      box-sizing: border-box;
+      transition: background-color 0.2s ease-in-out,
+        border-color 0.2s ease-in-out,
+        box-shadow 0.2s ease-in-out;
       caret-color: #ffffff;
 
-      /* Placeholder styling */
+      /* ── Placeholder ── */
       &::placeholder {
-        color: rgba(255, 255, 255, 0.65);
+        color: rgba(255, 255, 255, 0.6);
         opacity: 1;
       }
 
-      /* Focus state */
+      /* ── Focus State ── */
       &:focus {
         background-color: #1558b0 !important;
         border-color: #90caf9;
@@ -32,21 +44,22 @@ const StyledBlueTextBoxWrapper = styled.div(() => {
         color: #ffffff !important;
       }
 
-      /* Hover state */
-      &:hover:not(:disabled):not(:read-only) {
+      /* ── Hover State ── */
+      &:hover:not(:disabled):not(:read-only):not(:focus) {
         border-color: #90caf9;
         background-color: #1966d2 !important;
       }
 
-      /* Disabled state */
+      /* ── Disabled State ── */
       &:disabled {
         background-color: #a4c4f4 !important;
         color: rgba(255, 255, 255, 0.5) !important;
         border-color: #a4c4f4;
         cursor: not-allowed;
+        opacity: 0.7;
       }
 
-      /* Read-only state */
+      /* ── Read-Only State ── */
       &:read-only {
         background-color: #2b7de9 !important;
         border-color: transparent;
@@ -54,15 +67,16 @@ const StyledBlueTextBoxWrapper = styled.div(() => {
       }
     }
 
-    /* Label styling */
+    /* ===== Label ===== */
     label {
       color: #1a73e8;
       font-weight: 600;
-      margin-bottom: 0.25rem;
       font-size: 0.875rem;
+      margin-bottom: 0.375rem;
+      display: block;
     }
 
-    /* Helper text styling */
+    /* ===== Helper / Info Text ===== */
     .helper-text,
     [class*="HelperText"],
     small {
@@ -71,11 +85,24 @@ const StyledBlueTextBoxWrapper = styled.div(() => {
       margin-top: 0.25rem;
     }
 
-    /* Error state styling */
+    /* ===== Error State ===== */
     [status="error"] input[type="text"],
     input[type="text"][aria-invalid="true"] {
       border-color: #d93025 !important;
-      box-shadow: 0 0 0 2px rgba(217, 48, 37, 0.25);
+      box-shadow: 0 0 0 3px rgba(217, 48, 37, 0.2);
+      background-color: #1a73e8 !important;
+    }
+
+    [status="error"] input[type="text"]:focus,
+    input[type="text"][aria-invalid="true"]:focus {
+      border-color: #d93025 !important;
+      box-shadow: 0 0 0 3px rgba(217, 48, 37, 0.35);
+    }
+
+    /* ===== Display Mode Text ===== */
+    span[data-testid*="display"] {
+      color: #1a73e8;
+      font-weight: 500;
     }
   `;
 });

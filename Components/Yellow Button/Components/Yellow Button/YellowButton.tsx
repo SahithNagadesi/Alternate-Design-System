@@ -4,7 +4,7 @@
  * Pure React component with zero Pega dependencies.
  * All Pega wiring lives in index.tsx (the bridge).
  *
- * @version 2.2.0
+ * @version 2.3.0
  */
 
 import React, { useState, useCallback, useRef } from "react";
@@ -30,7 +30,7 @@ export interface YellowButtonProps {
   loading?: boolean;
   /** Tooltip text displayed on hover */
   tooltip?: string;
-  /** Full-width button */
+  /** Full-width button stretches to fill container */
   fullWidth?: boolean;
   /** data-testid for automation */
   testId?: string;
@@ -97,7 +97,7 @@ export const YellowButton: React.FC<YellowButtonProps> = ({
       });
       setTimeout(() => setRipple(null), 500);
     },
-    [isDisabled]
+    [isDisabled],
   );
 
   /* ── Click handler ── */
@@ -108,7 +108,7 @@ export const YellowButton: React.FC<YellowButtonProps> = ({
         onClick?.(e);
       }
     },
-    [isDisabled, onClick, spawnRipple]
+    [isDisabled, onClick, spawnRipple],
   );
 
   /* ── Keyboard support ── */
@@ -119,7 +119,7 @@ export const YellowButton: React.FC<YellowButtonProps> = ({
         setPressed(true);
       }
     },
-    [isDisabled]
+    [isDisabled],
   );
 
   const handleKeyUp = useCallback(
@@ -129,7 +129,7 @@ export const YellowButton: React.FC<YellowButtonProps> = ({
         buttonRef.current?.click();
       }
     },
-    [isDisabled]
+    [isDisabled],
   );
 
   /* ── Build class list ── */

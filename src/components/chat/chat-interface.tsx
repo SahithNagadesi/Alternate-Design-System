@@ -1,18 +1,49 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import { Send, Loader2, Paperclip, X, Sparkles, MessageSquarePlus } from "lucide-react";
+import {
+  Send,
+  Loader2,
+  Paperclip,
+  X,
+  Sparkles,
+  MessageSquarePlus,
+  FileCode,
+  Check,
+  AlertCircle,
+  FolderOpen,
+  Eye,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { ChatMessage } from "@/components/chat/chat-message";
 import { toast } from "sonner";
 
+interface FileOperation {
+  action: string;
+  path: string;
+}
+
 interface Message {
   id: string;
   role: "USER" | "ASSISTANT";
   content: string;
   createdAt: string;
+  fileAttachments?: FileOperation[] | null;
+}
+
+interface TokenUsage {
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+}
+
+interface ActiveToolOp {
+  tool: string;
+  path: string;
+  status: "running" | "done" | "error";
+  operation?: FileOperation;
 }
 
 interface ChatInterfaceProps {
@@ -26,6 +57,8 @@ export function ChatInterface({ projectId, includeContext }: ChatInterfaceProps)
   const [sending, setSending] = useState(false);
   const [streamingContent, setStreamingContent] = useState("");
   const [attachments, setAttachments] = useState<File[]>([]);
+  const [activeOps, setActiveOps] = useState<ActiveToolOp[]>([]);
+  const [tokenUsage, setTokenUsage] = useState<Record<string, TokenUsage>>({});
   const scrollRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -39,7 +72,7 @@ export function ChatInterface({ projectId, includeContext }: ChatInterfaceProps)
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages, streamingContent]);
+  }, [messages, streamingContent, activeOps]);
 
   async function fetchMessages() {
     try {
@@ -47,7 +80,6 @@ export function ChatInterface({ projectId, includeContext }: ChatInterfaceProps)
       if (res.ok) {
         const data = await res.json();
         setMessages(data);
-        // Jump to bottom instantly on initial load
         isInitialLoad.current = true;
       }
     } catch {
@@ -58,7 +90,6 @@ export function ChatInterface({ projectId, includeContext }: ChatInterfaceProps)
   function scrollToBottom() {
     requestAnimationFrame(() => {
       if (isInitialLoad.current) {
-        // Instant jump on first load
         scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
         isInitialLoad.current = false;
       } else {
@@ -71,7 +102,6 @@ export function ChatInterface({ projectId, includeContext }: ChatInterfaceProps)
     let content = input.trim();
     if (!content || sending) return;
 
-    // If there are file attachments, read their content and append
     if (attachments.length > 0) {
       const fileTexts = await Promise.all(
         attachments.map(async (file) => {
@@ -90,15 +120,22 @@ export function ChatInterface({ projectId, includeContext }: ChatInterfaceProps)
     setAttachments([]);
     setSending(true);
     setStreamingContent("");
+    setActiveOps([]);
 
-    // Optimistically add user message
     const tempId = `temp-${Date.now()}`;
-    const userDisplay = input.trim() + (attachments.length > 0
-      ? `\n\n[Attached: ${attachments.map(f => f.name).join(", ")}]`
-      : "");
+    const userDisplay =
+      input.trim() +
+      (attachments.length > 0
+        ? `\n\n[Attached: ${attachments.map((f) => f.name).join(", ")}]`
+        : "");
     setMessages((prev) => [
       ...prev,
-      { id: tempId, role: "USER", content: userDisplay, createdAt: new Date().toISOString() },
+      {
+        id: tempId,
+        role: "USER",
+        content: userDisplay,
+        createdAt: new Date().toISOString(),
+      },
     ]);
 
     try {
@@ -113,7 +150,6 @@ export function ChatInterface({ projectId, includeContext }: ChatInterfaceProps)
         throw new Error(data.error || "Failed to send message");
       }
 
-      // Handle streaming response
       const reader = res.body?.getReader();
       const decoder = new TextDecoder();
       let fullContent = "";
@@ -134,16 +170,51 @@ export function ChatInterface({ projectId, includeContext }: ChatInterfaceProps)
               const data = JSON.parse(line.slice(6));
 
               if (data.type === "user_message") {
-                // Replace temp message with saved one
                 setMessages((prev) =>
                   prev.map((m) => (m.id === tempId ? data.message : m))
                 );
               } else if (data.type === "delta") {
                 fullContent += data.text;
                 setStreamingContent(fullContent);
+              } else if (data.type === "tool_start") {
+                setActiveOps((prev) => [
+                  ...prev,
+                  {
+                    tool: data.tool,
+                    path: data.path,
+                    status: "running",
+                  },
+                ]);
+              } else if (data.type === "tool_done") {
+                setActiveOps((prev) =>
+                  prev.map((op) =>
+                    op.path === data.path && op.status === "running"
+                      ? {
+                          ...op,
+                          status: "done" as const,
+                          operation: data.operation,
+                        }
+                      : op
+                  )
+                );
+              } else if (data.type === "tool_error") {
+                setActiveOps((prev) =>
+                  prev.map((op) =>
+                    op.path === data.path && op.status === "running"
+                      ? { ...op, status: "error" as const }
+                      : op
+                  )
+                );
               } else if (data.type === "done") {
                 setStreamingContent("");
+                setActiveOps([]);
                 setMessages((prev) => [...prev, data.message]);
+                if (data.usage) {
+                  setTokenUsage((prev) => ({
+                    ...prev,
+                    [data.message.id]: data.usage,
+                  }));
+                }
               } else if (data.type === "error") {
                 throw new Error(data.error);
               }
@@ -159,6 +230,7 @@ export function ChatInterface({ projectId, includeContext }: ChatInterfaceProps)
       setMessages((prev) => prev.filter((m) => m.id !== tempId));
       setInput(input);
       setStreamingContent("");
+      setActiveOps([]);
     } finally {
       setSending(false);
       textareaRef.current?.focus();
@@ -182,9 +254,23 @@ export function ChatInterface({ projectId, includeContext }: ChatInterfaceProps)
     setAttachments((prev) => prev.filter((_, i) => i !== index));
   }
 
+  function toolIcon(tool: string) {
+    if (tool === "write_file") return <FileCode className="h-3 w-3" />;
+    if (tool === "read_file") return <Eye className="h-3 w-3" />;
+    if (tool === "list_files") return <FolderOpen className="h-3 w-3" />;
+    return <FileCode className="h-3 w-3" />;
+  }
+
+  function toolLabel(tool: string) {
+    if (tool === "write_file") return "Writing";
+    if (tool === "read_file") return "Reading";
+    if (tool === "list_files") return "Listing";
+    return tool;
+  }
+
   return (
     <div className="flex flex-1 flex-col overflow-hidden rounded-xl border border-border/60 bg-gradient-to-b from-card to-card/80 shadow-lg min-h-0">
-      {/* Messages Area — native scrollable div */}
+      {/* Messages Area */}
       <div
         ref={scrollRef}
         className="flex-1 overflow-y-auto scroll-smooth px-4 py-5 sm:px-6 min-h-0"
@@ -195,13 +281,19 @@ export function ChatInterface({ projectId, includeContext }: ChatInterfaceProps)
               <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/10 to-accent/40 shadow-inner">
                 <MessageSquarePlus className="h-8 w-8 text-primary" />
               </div>
-              <h3 className="text-xl font-semibold tracking-tight">Start a conversation</h3>
+              <h3 className="text-xl font-semibold tracking-tight">
+                Start a conversation
+              </h3>
               <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
                 Describe the Pega component or application you want to build.
                 Attach files for context or enable project documents.
               </p>
               <div className="mt-5 flex flex-wrap justify-center gap-2">
-                {["Create a DX API form", "Build a data table", "Design a dashboard"].map((s) => (
+                {[
+                  "Create a DX API form",
+                  "Build a data table",
+                  "Design a dashboard",
+                ].map((s) => (
                   <button
                     key={s}
                     onClick={() => setInput(s)}
@@ -216,7 +308,14 @@ export function ChatInterface({ projectId, includeContext }: ChatInterfaceProps)
         ) : (
           <div className="space-y-5">
             {messages.map((message) => (
-              <ChatMessage key={message.id} message={message} />
+              <div key={message.id}>
+                <ChatMessage message={message} />
+                {message.role === "ASSISTANT" && tokenUsage[message.id] && (
+                  <div className="ml-12 mt-1 text-[10px] text-muted-foreground/50">
+                    {tokenUsage[message.id].inputTokens.toLocaleString()} in / {tokenUsage[message.id].outputTokens.toLocaleString()} out tokens
+                  </div>
+                )}
+              </div>
             ))}
             {/* Streaming AI response */}
             {streamingContent && (
@@ -230,12 +329,49 @@ export function ChatInterface({ projectId, includeContext }: ChatInterfaceProps)
                 isStreaming
               />
             )}
-            {sending && !streamingContent && (
+            {/* Active file operations */}
+            {activeOps.length > 0 && (
+              <div className="chat-fade-in ml-12 rounded-lg border border-border/50 bg-muted/20 p-3">
+                <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/60">
+                  File Operations
+                </p>
+                <div className="space-y-1.5">
+                  {activeOps.map((op, i) => (
+                    <div
+                      key={i}
+                      className="flex items-center gap-2 text-xs"
+                    >
+                      {op.status === "running" ? (
+                        <Loader2 className="h-3 w-3 animate-spin text-primary" />
+                      ) : op.status === "done" ? (
+                        <Check className="h-3 w-3 text-green-500" />
+                      ) : (
+                        <AlertCircle className="h-3 w-3 text-red-500" />
+                      )}
+                      <span className="flex items-center gap-1 text-muted-foreground">
+                        {toolIcon(op.tool)}
+                        {toolLabel(op.tool)}
+                      </span>
+                      <span className="font-mono text-foreground">
+                        {op.path}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {sending && !streamingContent && activeOps.length === 0 && (
               <div className="chat-fade-in flex items-center gap-3 pl-12">
                 <div className="flex items-center gap-1.5 rounded-xl bg-muted/70 px-4 py-3">
                   <span className="typing-dot h-2 w-2 rounded-full bg-primary/60" />
-                  <span className="typing-dot h-2 w-2 rounded-full bg-primary/60" style={{ animationDelay: "0.15s" }} />
-                  <span className="typing-dot h-2 w-2 rounded-full bg-primary/60" style={{ animationDelay: "0.3s" }} />
+                  <span
+                    className="typing-dot h-2 w-2 rounded-full bg-primary/60"
+                    style={{ animationDelay: "0.15s" }}
+                  />
+                  <span
+                    className="typing-dot h-2 w-2 rounded-full bg-primary/60"
+                    style={{ animationDelay: "0.3s" }}
+                  />
                 </div>
               </div>
             )}
@@ -248,7 +384,11 @@ export function ChatInterface({ projectId, includeContext }: ChatInterfaceProps)
       {attachments.length > 0 && (
         <div className="flex flex-wrap gap-2 border-t border-border/50 bg-muted/30 px-4 py-2.5">
           {attachments.map((file, i) => (
-            <Badge key={i} variant="secondary" className="gap-1.5 pr-1 rounded-full">
+            <Badge
+              key={i}
+              variant="secondary"
+              className="gap-1.5 pr-1 rounded-full"
+            >
               <Paperclip className="h-3 w-3 opacity-50" />
               {file.name}
               <button
@@ -313,7 +453,8 @@ export function ChatInterface({ projectId, includeContext }: ChatInterfaceProps)
           <div className="flex items-center gap-2">
             {attachments.length > 0 && (
               <span className="text-[11px] text-muted-foreground/70">
-                {attachments.length} file{attachments.length > 1 ? "s" : ""} attached
+                {attachments.length} file{attachments.length > 1 ? "s" : ""}{" "}
+                attached
               </span>
             )}
             {includeContext && (

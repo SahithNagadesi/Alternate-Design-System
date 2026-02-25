@@ -2,13 +2,23 @@
 
 import { useEffect, useState, use } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Settings, FolderOpen, BookOpen } from "lucide-react";
+import dynamic from "next/dynamic";
+import { ArrowLeft, Settings, FolderOpen, BookOpen, Eye, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ChatInterface } from "@/components/chat/chat-interface";
 import { ContextPanel } from "@/components/projects/context-panel";
 import { ProjectSettingsDialog } from "@/components/projects/project-settings-dialog";
+import { PublishDialog } from "@/components/projects/publish-dialog";
 import Link from "next/link";
+
+const ComponentPreview = dynamic(
+  () =>
+    import("@/components/projects/component-preview").then(
+      (mod) => mod.ComponentPreview
+    ),
+  { ssr: false }
+);
 
 interface Project {
   id: string;
@@ -35,6 +45,8 @@ export default function ProjectPage({
   const [contextOpen, setContextOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [includeContext, setIncludeContext] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [publishOpen, setPublishOpen] = useState(false);
 
   async function fetchProject() {
     try {
@@ -67,6 +79,8 @@ export default function ProjectPage({
 
   if (!project) return null;
 
+  const isComponent = project.type === "COMPONENT";
+
   return (
     <div className="flex h-[calc(100vh-6rem)] flex-col">
       {/* Project Header */}
@@ -81,10 +95,10 @@ export default function ProjectPage({
             <div className="flex items-center gap-2.5">
               <h1 className="text-lg font-bold tracking-tight">{project.name}</h1>
               <Badge
-                variant={project.type === "COMPONENT" ? "default" : "secondary"}
+                variant={isComponent ? "default" : "secondary"}
                 className="rounded-full text-[10px] font-semibold uppercase tracking-wider px-2.5"
               >
-                {project.type === "COMPONENT" ? "Component" : "Application"}
+                {isComponent ? "Component" : "Application"}
               </Badge>
             </div>
             <p className="text-xs text-muted-foreground/70 mt-0.5">
@@ -96,6 +110,28 @@ export default function ProjectPage({
           </div>
         </div>
         <div className="flex items-center gap-1.5">
+          {isComponent && (
+            <>
+              <Button
+                variant={previewOpen ? "default" : "outline"}
+                size="sm"
+                className="rounded-lg gap-1.5 text-xs font-medium h-8"
+                onClick={() => setPreviewOpen(!previewOpen)}
+              >
+                <Eye className="h-3.5 w-3.5" />
+                Preview
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="rounded-lg gap-1.5 text-xs font-medium h-8"
+                onClick={() => setPublishOpen(true)}
+              >
+                <Upload className="h-3.5 w-3.5" />
+                Publish
+              </Button>
+            </>
+          )}
           <Button
             variant={includeContext ? "default" : "outline"}
             size="sm"
@@ -131,6 +167,13 @@ export default function ProjectPage({
           <ChatInterface projectId={projectId} includeContext={includeContext} />
         </div>
 
+        {/* Preview Panel (Component projects only) */}
+        {previewOpen && isComponent && (
+          <div className="w-[480px] shrink-0 chat-fade-in">
+            <ComponentPreview projectId={projectId} />
+          </div>
+        )}
+
         {/* Context Panel */}
         {contextOpen && (
           <div className="w-80 shrink-0 chat-fade-in">
@@ -145,6 +188,14 @@ export default function ProjectPage({
         onOpenChange={setSettingsOpen}
         onUpdated={fetchProject}
       />
+
+      {isComponent && (
+        <PublishDialog
+          project={project}
+          open={publishOpen}
+          onOpenChange={setPublishOpen}
+        />
+      )}
     </div>
   );
 }

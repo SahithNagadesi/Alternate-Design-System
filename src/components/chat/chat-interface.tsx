@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { ChatMessage } from "@/components/chat/chat-message";
+import { ThinkingIndicator } from "@/components/chat/thinking-indicator";
 import { toast } from "sonner";
 
 interface FileOperation {
@@ -361,19 +362,7 @@ export function ChatInterface({ projectId, includeContext }: ChatInterfaceProps)
               </div>
             )}
             {sending && !streamingContent && activeOps.length === 0 && (
-              <div className="chat-fade-in flex items-center gap-3 pl-12">
-                <div className="flex items-center gap-1.5 rounded-xl bg-muted/70 px-4 py-3">
-                  <span className="typing-dot h-2 w-2 rounded-full bg-primary/60" />
-                  <span
-                    className="typing-dot h-2 w-2 rounded-full bg-primary/60"
-                    style={{ animationDelay: "0.15s" }}
-                  />
-                  <span
-                    className="typing-dot h-2 w-2 rounded-full bg-primary/60"
-                    style={{ animationDelay: "0.3s" }}
-                  />
-                </div>
-              </div>
+              <ThinkingIndicator />
             )}
             <div ref={bottomRef} />
           </div>

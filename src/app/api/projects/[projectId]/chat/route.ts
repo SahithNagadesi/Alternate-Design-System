@@ -41,6 +41,38 @@ When generating code:
 When the user uploads files, analyze them and incorporate the context into your responses.
 When context documents are provided, use them as reference material for your answers.`;
 
+const STORYBOOK_ADDENDUM = `
+
+IMPORTANT — Storybook Story Generation:
+When you create or update a React component for this project, ALWAYS also generate a companion Storybook story file.
+
+Rules for story files:
+- Use Component Story Format 3 (CSF3) with TypeScript.
+- Name the story file the same as the component with a .stories.tsx suffix (e.g. Button.tsx → Button.stories.tsx).
+- Each story file must be self-contained: only import React and the component itself. Do NOT import external design tokens, theme providers, or third-party libraries in stories.
+- Export a default meta object with title (use "Components/<ComponentName>") and component reference.
+- Export at least a "Default" story and, where appropriate, additional variants (e.g. Primary, Disabled, WithIcon).
+- Include args/argTypes for the component's main props so they are controllable in Storybook.
+- Wrap the component in minimal inline styles or a plain <div> if it needs layout context.
+- Write the story file using the write_file tool just like any other code file.
+
+Example skeleton:
+\`\`\`tsx
+import type { Meta, StoryObj } from "@storybook/react";
+import { MyComponent } from "./MyComponent";
+
+const meta: Meta<typeof MyComponent> = {
+  title: "Components/MyComponent",
+  component: MyComponent,
+  argTypes: { label: { control: "text" } },
+};
+export default meta;
+type Story = StoryObj<typeof MyComponent>;
+
+export const Default: Story = { args: { label: "Hello" } };
+\`\`\`
+`;
+
 const TOOLS_ADDENDUM = `
 
 You have access to tools that let you directly create, read, and modify files in the project's GitHub repository.
@@ -380,8 +412,10 @@ export async function POST(
   const isCodeRequest = /\b(create|build|write|generate|implement|add|make|update|modify|refactor|fix)\b/i.test(content) || content.length > 200;
   const maxTokens = isCodeRequest ? 8192 : 2048;
 
+  const storybookAddendum =
+    hasGithubTools && project?.type === "COMPONENT" ? STORYBOOK_ADDENDUM : "";
   const systemPrompt =
-    SYSTEM_PROMPT + projectContext + (hasGithubTools ? TOOLS_ADDENDUM : "");
+    SYSTEM_PROMPT + projectContext + (hasGithubTools ? TOOLS_ADDENDUM : "") + storybookAddendum;
 
   const tools = hasGithubTools ? getFileTools() : undefined;
 

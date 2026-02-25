@@ -61,7 +61,7 @@ export async function PATCH(
   }
 
   const body = await req.json();
-  const { name, pegaServerUrl, pegaUsername, pegaPassword } = body;
+  const { name, pegaServerUrl, pegaUsername, pegaPassword, metadata } = body;
 
   const updateData: Record<string, unknown> = {};
   if (name) updateData.name = name;
@@ -71,6 +71,7 @@ export async function PATCH(
       JSON.stringify({ username: pegaUsername, password: pegaPassword })
     );
   }
+  if (metadata !== undefined) updateData.metadata = metadata;
 
   const project = await prisma.project.update({
     where: { id: projectId },

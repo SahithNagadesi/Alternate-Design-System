@@ -14,8 +14,17 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { Trash2, UserPlus, Crown, User } from "lucide-react";
 import { toast } from "sonner";
+import type { ApplicationMetadata } from "@/types/project-metadata";
 
 interface Project {
   id: string;
@@ -23,6 +32,7 @@ interface Project {
   type: "COMPONENT" | "APPLICATION";
   pegaServerUrl: string | null;
   folderPath: string;
+  metadata?: ApplicationMetadata | null;
   members: Array<{
     role: string;
     user: { id: string; name: string; email: string };
@@ -60,11 +70,36 @@ export function ProjectSettingsDialog({
   const [newMemberEmail, setNewMemberEmail] = useState("");
   const [addingMember, setAddingMember] = useState(false);
 
+  // App Config state (APPLICATION projects only)
+  const [appMetadata, setAppMetadata] = useState<ApplicationMetadata>({
+    frontendFramework: "",
+    frontendFrameworkOther: "",
+    pegaAppName: "",
+    caseTypes: "",
+    dxApiVersion: "24.1",
+    dxApiAuthMethod: "Basic",
+    dxApiEndpoints: "",
+  });
+  const [savingMetadata, setSavingMetadata] = useState(false);
+
+  const isApplication = project.type === "APPLICATION";
+
   useEffect(() => {
     if (open) {
       setName(project.name);
       setPegaServerUrl(project.pegaServerUrl || "");
       fetchMembers();
+      if (isApplication && project.metadata) {
+        setAppMetadata({
+          frontendFramework: project.metadata.frontendFramework || "",
+          frontendFrameworkOther: project.metadata.frontendFrameworkOther || "",
+          pegaAppName: project.metadata.pegaAppName || "",
+          caseTypes: project.metadata.caseTypes || "",
+          dxApiVersion: project.metadata.dxApiVersion || "24.1",
+          dxApiAuthMethod: project.metadata.dxApiAuthMethod || "Basic",
+          dxApiEndpoints: project.metadata.dxApiEndpoints || "",
+        });
+      }
     }
   }, [open, project]);
 
@@ -183,6 +218,28 @@ export function ProjectSettingsDialog({
     }
   }
 
+  async function handleSaveMetadata(e: React.FormEvent) {
+    e.preventDefault();
+    setSavingMetadata(true);
+
+    try {
+      const res = await fetch(`/api/projects/${project.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ metadata: appMetadata }),
+      });
+
+      if (!res.ok) throw new Error("Failed to update");
+
+      toast.success("App configuration updated");
+      onUpdated();
+    } catch {
+      toast.error("Failed to update app configuration");
+    } finally {
+      setSavingMetadata(false);
+    }
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
@@ -194,8 +251,9 @@ export function ProjectSettingsDialog({
         </DialogHeader>
 
         <Tabs defaultValue="general" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className={`grid w-full ${isApplication ? "grid-cols-3" : "grid-cols-2"}`}>
             <TabsTrigger value="general">General</TabsTrigger>
+            {isApplication && <TabsTrigger value="appconfig">App Config</TabsTrigger>}
             <TabsTrigger value="members">Members ({members.length})</TabsTrigger>
           </TabsList>
 
@@ -270,6 +328,129 @@ export function ProjectSettingsDialog({
               </DialogFooter>
             </form>
           </TabsContent>
+
+          {isApplication && (
+            <TabsContent value="appconfig">
+              <form onSubmit={handleSaveMetadata} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="settings-pega-app">Pega Application Name</Label>
+                  <Input
+                    id="settings-pega-app"
+                    value={appMetadata.pegaAppName}
+                    onChange={(e) =>
+                      setAppMetadata({ ...appMetadata, pegaAppName: e.target.value })
+                    }
+                    placeholder="e.g. MyApp"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="settings-framework">Frontend Framework</Label>
+                  <Select
+                    value={appMetadata.frontendFramework}
+                    onValueChange={(val) =>
+                      setAppMetadata({ ...appMetadata, frontendFramework: val, frontendFrameworkOther: val !== "Other" ? "" : appMetadata.frontendFrameworkOther })
+                    }
+                  >
+                    <SelectTrigger id="settings-framework">
+                      <SelectValue placeholder="Select framework" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="React">React</SelectItem>
+                      <SelectItem value="Angular">Angular</SelectItem>
+                      <SelectItem value="Vue">Vue</SelectItem>
+                      <SelectItem value="Svelte">Svelte</SelectItem>
+                      <SelectItem value="Other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {appMetadata.frontendFramework === "Other" && (
+                    <Input
+                      placeholder="Enter framework name"
+                      value={appMetadata.frontendFrameworkOther || ""}
+                      onChange={(e) =>
+                        setAppMetadata({ ...appMetadata, frontendFrameworkOther: e.target.value })
+                      }
+                    />
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="settings-casetypes">Case Types</Label>
+                  <Input
+                    id="settings-casetypes"
+                    value={appMetadata.caseTypes}
+                    onChange={(e) =>
+                      setAppMetadata({ ...appMetadata, caseTypes: e.target.value })
+                    }
+                    placeholder="e.g. MyOrg-MyApp-Work-Order, MyOrg-MyApp-Work-ServiceRequest"
+                  />
+                  <p className="text-xs text-muted-foreground">Comma-separated list</p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="settings-dxversion">DX API Version</Label>
+                    <Select
+                      value={appMetadata.dxApiVersion}
+                      onValueChange={(val) =>
+                        setAppMetadata({ ...appMetadata, dxApiVersion: val })
+                      }
+                    >
+                      <SelectTrigger id="settings-dxversion">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="24.1">24.1</SelectItem>
+                        <SelectItem value="23.1">23.1</SelectItem>
+                        <SelectItem value="22.1">22.1</SelectItem>
+                        <SelectItem value="8.8">8.8</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="settings-dxauth">Auth Method</Label>
+                    <Select
+                      value={appMetadata.dxApiAuthMethod}
+                      onValueChange={(val) =>
+                        setAppMetadata({ ...appMetadata, dxApiAuthMethod: val })
+                      }
+                    >
+                      <SelectTrigger id="settings-dxauth">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Basic">Basic</SelectItem>
+                        <SelectItem value="OAuth 2.0">OAuth 2.0</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="settings-dxendpoints">DX API Endpoints</Label>
+                  <Textarea
+                    id="settings-dxendpoints"
+                    value={appMetadata.dxApiEndpoints || ""}
+                    onChange={(e) =>
+                      setAppMetadata({ ...appMetadata, dxApiEndpoints: e.target.value })
+                    }
+                    placeholder="Optional: custom DX API endpoint paths"
+                    rows={3}
+                  />
+                </div>
+
+                <DialogFooter>
+                  <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                    Cancel
+                  </Button>
+                  <Button type="submit" disabled={savingMetadata}>
+                    {savingMetadata ? "Saving..." : "Save Config"}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </TabsContent>
+          )}
 
           <TabsContent value="members" className="space-y-4">
             {/* Add Member Form */}

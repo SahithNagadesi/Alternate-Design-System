@@ -19,6 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { Github, FolderGit2, Loader2, RefreshCw } from "lucide-react";
 
@@ -53,6 +54,15 @@ export function CreateProjectDialog({
   const [pegaUsername, setPegaUsername] = useState("");
   const [pegaPassword, setPegaPassword] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // Application metadata state
+  const [frontendFramework, setFrontendFramework] = useState("React");
+  const [frontendFrameworkOther, setFrontendFrameworkOther] = useState("");
+  const [pegaAppName, setPegaAppName] = useState("");
+  const [caseTypes, setCaseTypes] = useState("");
+  const [dxApiVersion, setDxApiVersion] = useState("24.1");
+  const [dxApiAuthMethod, setDxApiAuthMethod] = useState("Basic");
+  const [dxApiEndpoints, setDxApiEndpoints] = useState("");
 
   // GitHub state
   const [repos, setRepos] = useState<GitHubRepo[]>([]);
@@ -138,6 +148,15 @@ export function CreateProjectDialog({
 
     setLoading(true);
     try {
+      const metadata = type === "APPLICATION" ? {
+        frontendFramework: frontendFramework === "Other" ? frontendFrameworkOther.trim() : frontendFramework,
+        pegaAppName: pegaAppName.trim(),
+        caseTypes: caseTypes.trim(),
+        dxApiVersion,
+        dxApiAuthMethod,
+        dxApiEndpoints: dxApiEndpoints.trim() || undefined,
+      } : undefined;
+
       const res = await fetch("/api/projects", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -149,6 +168,7 @@ export function CreateProjectDialog({
           pegaPassword: pegaPassword.trim() || undefined,
           githubRepo: selectedRepo || undefined,
           githubFolder: selectedFolder || undefined,
+          metadata,
         }),
       });
 
@@ -165,6 +185,13 @@ export function CreateProjectDialog({
       setPegaPassword("");
       setSelectedRepo("");
       setSelectedFolder("");
+      setFrontendFramework("React");
+      setFrontendFrameworkOther("");
+      setPegaAppName("");
+      setCaseTypes("");
+      setDxApiVersion("24.1");
+      setDxApiAuthMethod("Basic");
+      setDxApiEndpoints("");
       onCreated();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to create project");
@@ -201,16 +228,103 @@ export function CreateProjectDialog({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="COMPONENT">Custom Component</SelectItem>
+                <SelectItem value="COMPONENT">Pega Constellation Component</SelectItem>
                 <SelectItem value="APPLICATION">Alternate Design System</SelectItem>
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
               {type === "COMPONENT"
-                ? "A Pega UI component publishable to a Pega server"
+                ? "A Pega Constellation custom DX component publishable to a Pega server"
                 : "A full application using Pega as backend via DX APIs"}
             </p>
           </div>
+
+          {/* Application Metadata Fields */}
+          {type === "APPLICATION" && (
+            <div className="space-y-3 rounded-md border p-3">
+              <p className="text-sm font-medium">Application Configuration</p>
+              <div className="space-y-2">
+                <Label htmlFor="pega-app-name">Pega Application Name *</Label>
+                <Input
+                  id="pega-app-name"
+                  placeholder="e.g. MyApp"
+                  value={pegaAppName}
+                  onChange={(e) => setPegaAppName(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="frontend-framework">Frontend Framework</Label>
+                <Select value={frontendFramework} onValueChange={setFrontendFramework}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="React">React</SelectItem>
+                    <SelectItem value="Angular">Angular</SelectItem>
+                    <SelectItem value="Vue">Vue</SelectItem>
+                    <SelectItem value="Svelte">Svelte</SelectItem>
+                    <SelectItem value="Other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+                {frontendFramework === "Other" && (
+                  <Input
+                    placeholder="Enter framework name"
+                    value={frontendFrameworkOther}
+                    onChange={(e) => setFrontendFrameworkOther(e.target.value)}
+                    required
+                  />
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="case-types">Case Types (comma-separated)</Label>
+                <Input
+                  id="case-types"
+                  placeholder="e.g. ServiceRequest, Incident"
+                  value={caseTypes}
+                  onChange={(e) => setCaseTypes(e.target.value)}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label htmlFor="dx-api-version">DX API Version</Label>
+                  <Select value={dxApiVersion} onValueChange={setDxApiVersion}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="24.1">24.1</SelectItem>
+                      <SelectItem value="23.1">23.1</SelectItem>
+                      <SelectItem value="22.1">22.1</SelectItem>
+                      <SelectItem value="8.8">8.8</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="dx-auth-method">Auth Method</Label>
+                  <Select value={dxApiAuthMethod} onValueChange={setDxApiAuthMethod}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Basic">Basic</SelectItem>
+                      <SelectItem value="OAuth 2.0">OAuth 2.0</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="dx-endpoints">DX API Endpoints (optional)</Label>
+                <Textarea
+                  id="dx-endpoints"
+                  placeholder="e.g. /cases, /assignments, /data_views/D_Operators"
+                  value={dxApiEndpoints}
+                  onChange={(e) => setDxApiEndpoints(e.target.value)}
+                  rows={2}
+                />
+              </div>
+            </div>
+          )}
 
           {/* GitHub Repository Section */}
           <div className="space-y-3 rounded-md border p-3">
@@ -357,7 +471,7 @@ export function CreateProjectDialog({
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={loading || !name.trim()}>
+            <Button type="submit" disabled={loading || !name.trim() || (type === "APPLICATION" && !pegaAppName.trim())}>
               {loading ? "Creating..." : "Create Project"}
             </Button>
           </DialogFooter>

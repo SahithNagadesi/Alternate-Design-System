@@ -41,6 +41,25 @@ When generating code:
 When the user uploads files, analyze them and incorporate the context into your responses.
 When context documents are provided, use them as reference material for your answers.`;
 
+const CONSTELLATION_ADDENDUM = `
+
+IMPORTANT — Pega Constellation Component Development:
+This project is a Pega Constellation custom DX component. Follow these guidelines:
+
+- Use PConnect APIs (getPConnectOfActiveContainerItem, getComponentName, etc.) for data binding.
+- Build with Cosmos React components (@pega/cosmos-react-core, @pega/cosmos-react-work, etc.) for consistent styling.
+- Follow the standard Constellation component file structure:
+  - index.ts (exports)
+  - config.json (component metadata, properties, and events)
+  - <ComponentName>.tsx (main component)
+  - <ComponentName>.styles.ts (styled-components)
+  - demo.stories.tsx (Storybook story)
+- In config.json, declare properties using Pega types (Text, Boolean, Integer, etc.) and define events.
+- Use \`getPConnect().getValue('.PropertyName')\` for reading case data and \`getPConnect().setValue('.PropertyName', value)\` for writing.
+- Ensure components handle loading, error, and empty states gracefully.
+- Use Pega design tokens for colors, spacing, and typography where possible.
+`;
+
 const STORYBOOK_ADDENDUM = `
 
 IMPORTANT — Storybook Story Generation:
@@ -146,6 +165,49 @@ function getFileTools(): Anthropic.Tool[] {
       },
     },
   ];
+}
+
+function buildApplicationContext(metadata: Record<string, unknown> | null): string {
+  if (!metadata) return "";
+
+  const framework = metadata.frontendFramework === "Other"
+    ? (metadata.frontendFrameworkOther as string) || "Unknown"
+    : (metadata.frontendFramework as string) || "Not specified";
+  const pegaApp = (metadata.pegaAppName as string) || "Not specified";
+  const caseTypes = (metadata.caseTypes as string) || "Not specified";
+  const dxVersion = (metadata.dxApiVersion as string) || "24.1";
+  const authMethod = (metadata.dxApiAuthMethod as string) || "Basic";
+  const endpoints = (metadata.dxApiEndpoints as string) || "";
+
+  let ctx = `
+
+IMPORTANT — Alternate Design System / Application Context:
+This project is an Alternate Design System application using Pega as backend via DX APIs.
+
+- Frontend Framework: ${framework}
+- Pega Application: ${pegaApp}
+- Case Types: ${caseTypes}
+- DX API Version: ${dxVersion}
+- Authentication Method: ${authMethod}`;
+
+  if (endpoints) {
+    ctx += `\n- Custom Endpoints:\n${endpoints}`;
+  }
+
+  ctx += `
+
+DX API Integration Guidelines:
+- Use Pega DX API v${dxVersion} endpoints for all data operations.
+- Base URL pattern: {serverUrl}/prweb/api/application/v${dxVersion}/
+- Key endpoints: cases, data_views, assignments, casetypes, pages.
+- Authentication: ${authMethod === "OAuth 2.0"
+    ? "Use OAuth 2.0 token flow. Obtain tokens from the Pega authorization server and include as Bearer token."
+    : "Use HTTP Basic authentication with base64-encoded credentials in the Authorization header."}
+- Always handle API errors gracefully with proper error states in the UI.
+- Use the case types (${caseTypes}) when creating new work items or querying cases.
+- Implement proper CORS handling when connecting from ${framework} frontend to Pega server.`;
+
+  return ctx;
 }
 
 interface FileOperation {
@@ -294,18 +356,50 @@ export async function POST(
   // Project info
   const project = await prisma.project.findUnique({
     where: { id: projectId },
-    select: { name: true, type: true, folderPath: true, githubRepo: true },
+    select: { name: true, type: true, folderPath: true, githubRepo: true, metadata: true },
   });
 
-  // Context documents
+  // Context documents (project-level + linked folders)
   let contextText = "";
   if (includeContext) {
+    // Fetch project-level context documents
     const docs = await prisma.contextDocument.findMany({
       where: { projectId, enabled: true },
     });
-    if (docs.length > 0) {
+
+    // Fetch linked folder documents
+    const folderLinks = await prisma.projectFolderLink.findMany({
+      where: { projectId },
+      include: {
+        folder: {
+          include: {
+            documents: true,
+          },
+        },
+      },
+    });
+
+    const allDocEntries: { label: string; blobUrl: string; mimeType: string }[] = [];
+
+    // Add project-level docs
+    for (const d of docs) {
+      allDocEntries.push({ label: d.name, blobUrl: d.blobUrl, mimeType: d.mimeType });
+    }
+
+    // Add linked folder docs
+    for (const link of folderLinks) {
+      for (const d of link.folder.documents) {
+        allDocEntries.push({
+          label: `${link.folder.name}/${d.name}`,
+          blobUrl: d.blobUrl,
+          mimeType: d.mimeType,
+        });
+      }
+    }
+
+    if (allDocEntries.length > 0) {
       const docContents = await Promise.all(
-        docs.map(async (d) => {
+        allDocEntries.map(async (d) => {
           if (
             d.mimeType.startsWith("text/") ||
             d.mimeType === "application/json" ||
@@ -318,12 +412,12 @@ export async function POST(
               if (text.length > MAX_CONTEXT_DOC_SIZE) {
                 text = text.slice(0, MAX_CONTEXT_DOC_SIZE) + "\n... (truncated)";
               }
-              return `[${d.name}]:\n${text}`;
+              return `[${d.label}]:\n${text}`;
             } catch {
-              return `[${d.name}]: (could not read content)`;
+              return `[${d.label}]: (could not read content)`;
             }
           }
-          return `[${d.name}]: (binary file - ${d.mimeType})`;
+          return `[${d.label}]: (binary file - ${d.mimeType})`;
         })
       );
       contextText =
@@ -350,7 +444,7 @@ export async function POST(
   chatMessages.push({ role: "user", content: currentContent });
 
   const projectContext = project
-    ? `\nProject: "${project.name}" (${project.type === "COMPONENT" ? "Custom Component" : "Alternate Design System"})\nFolder: ${project.folderPath}`
+    ? `\nProject: "${project.name}" (${project.type === "COMPONENT" ? "Pega Constellation Custom Component" : "Alternate Design System"})\nFolder: ${project.folderPath}`
     : "";
 
   // Anthropic config
@@ -412,10 +506,16 @@ export async function POST(
   const isCodeRequest = /\b(create|build|write|generate|implement|add|make|update|modify|refactor|fix)\b/i.test(content) || content.length > 200;
   const maxTokens = isCodeRequest ? 8192 : 2048;
 
+  const constellationAddendum =
+    project?.type === "COMPONENT" ? CONSTELLATION_ADDENDUM : "";
   const storybookAddendum =
     hasGithubTools && project?.type === "COMPONENT" ? STORYBOOK_ADDENDUM : "";
+  const applicationAddendum =
+    project?.type === "APPLICATION"
+      ? buildApplicationContext(project.metadata as Record<string, unknown> | null)
+      : "";
   const systemPrompt =
-    SYSTEM_PROMPT + projectContext + (hasGithubTools ? TOOLS_ADDENDUM : "") + storybookAddendum;
+    SYSTEM_PROMPT + projectContext + constellationAddendum + applicationAddendum + (hasGithubTools ? TOOLS_ADDENDUM : "") + storybookAddendum;
 
   const tools = hasGithubTools ? getFileTools() : undefined;
 

@@ -10,6 +10,7 @@ import { ChatInterface } from "@/components/chat/chat-interface";
 import { ContextPanel } from "@/components/projects/context-panel";
 import { ProjectSettingsDialog } from "@/components/projects/project-settings-dialog";
 import { PublishDialog } from "@/components/projects/publish-dialog";
+import type { ApplicationMetadata } from "@/types/project-metadata";
 import Link from "next/link";
 
 const ComponentPreview = dynamic(
@@ -26,6 +27,7 @@ interface Project {
   type: "COMPONENT" | "APPLICATION";
   pegaServerUrl: string | null;
   folderPath: string;
+  metadata?: ApplicationMetadata | null;
   members: Array<{
     role: string;
     user: { id: string; name: string; email: string };
@@ -98,7 +100,7 @@ export default function ProjectPage({
                 variant={isComponent ? "default" : "secondary"}
                 className="rounded-full text-[10px] font-semibold uppercase tracking-wider px-2.5"
               >
-                {isComponent ? "Component" : "Application"}
+                {isComponent ? "Constellation Component" : "Application"}
               </Badge>
             </div>
             <p className="text-xs text-muted-foreground/70 mt-0.5">

@@ -3,12 +3,13 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { LayoutDashboard, Users, Settings, FolderKanban, PanelLeftClose, PanelLeft } from "lucide-react";
+import { LayoutDashboard, Users, Settings, FolderKanban, PanelLeftClose, PanelLeft, Library } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/documents", label: "Documents", icon: Library },
   { href: "/admin/users", label: "Admin Users", icon: Users, adminOnly: true },
   { href: "/admin/settings", label: "Settings", icon: Settings, adminOnly: true },
 ];

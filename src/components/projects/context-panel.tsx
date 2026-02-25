@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useState, useRef, useCallback } from "react";
-import { Upload, FileText, Trash2, Loader2, FileCode, FileImage, File } from "lucide-react";
+import { Upload, FileText, Trash2, Loader2, FileCode, FileImage, File, FolderOpen, Link2, Unlink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { LinkFolderDialog } from "@/components/documents/link-folder-dialog";
 
 interface Document {
   id: string;
@@ -14,6 +16,18 @@ interface Document {
   blobUrl: string;
   enabled: boolean;
   createdAt: string;
+}
+
+interface LinkedFolder {
+  id: string;
+  folderId: string;
+  folder: {
+    id: string;
+    name: string;
+    visibility: "PUBLIC" | "PRIVATE";
+    _count: { documents: number };
+    createdBy: { id: string; name: string | null };
+  };
 }
 
 function getFileIcon(mimeType: string) {
@@ -25,18 +39,28 @@ function getFileIcon(mimeType: string) {
 
 export function ContextPanel({ projectId }: { projectId: string }) {
   const [documents, setDocuments] = useState<Document[]>([]);
+  const [linkedFolders, setLinkedFolders] = useState<LinkedFolder[]>([]);
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
+  const [linkDialogOpen, setLinkDialogOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetchDocuments();
+    fetchLinkedFolders();
   }, [projectId]);
 
   async function fetchDocuments() {
     const res = await fetch(`/api/projects/${projectId}/documents`);
     if (res.ok) {
       setDocuments(await res.json());
+    }
+  }
+
+  async function fetchLinkedFolders() {
+    const res = await fetch(`/api/projects/${projectId}/folder-links`);
+    if (res.ok) {
+      setLinkedFolders(await res.json());
     }
   }
 
@@ -116,6 +140,17 @@ export function ContextPanel({ projectId }: { projectId: string }) {
     }
   }
 
+  async function unlinkFolder(linkId: string, folderName: string) {
+    if (!confirm(`Unlink "${folderName}" from this project?`)) return;
+    const res = await fetch(`/api/projects/${projectId}/folder-links/${linkId}`, {
+      method: "DELETE",
+    });
+    if (res.ok) {
+      setLinkedFolders((prev) => prev.filter((l) => l.id !== linkId));
+      toast.success("Folder unlinked");
+    }
+  }
+
   function toggleAll(enabled: boolean) {
     documents.forEach((doc) => {
       if (doc.enabled !== enabled) {
@@ -125,6 +160,7 @@ export function ContextPanel({ projectId }: { projectId: string }) {
   }
 
   const enabledCount = documents.filter((d) => d.enabled).length;
+  const totalLinkedDocs = linkedFolders.reduce((sum, l) => sum + l.folder._count.documents, 0);
 
   return (
     <div
@@ -138,20 +174,31 @@ export function ContextPanel({ projectId }: { projectId: string }) {
     >
       <div className="flex items-center justify-between border-b border-border/40 p-3">
         <h3 className="text-sm font-semibold">Context Documents</h3>
-        <Button
-          variant="outline"
-          size="sm"
-          className="rounded-lg h-7 text-xs"
-          onClick={() => fileInputRef.current?.click()}
-          disabled={uploading}
-        >
-          {uploading ? (
-            <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-          ) : (
-            <Upload className="mr-1 h-3 w-3" />
-          )}
-          Upload
-        </Button>
+        <div className="flex gap-1">
+          <Button
+            variant="outline"
+            size="sm"
+            className="rounded-lg h-7 text-xs"
+            onClick={() => setLinkDialogOpen(true)}
+          >
+            <Link2 className="mr-1 h-3 w-3" />
+            Link Folders
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="rounded-lg h-7 text-xs"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploading}
+          >
+            {uploading ? (
+              <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+            ) : (
+              <Upload className="mr-1 h-3 w-3" />
+            )}
+            Upload
+          </Button>
+        </div>
         <input
           ref={fileInputRef}
           type="file"
@@ -162,59 +209,116 @@ export function ContextPanel({ projectId }: { projectId: string }) {
       </div>
 
       <div className="flex-1 overflow-y-auto">
-        {documents.length === 0 ? (
+        {/* Linked Folders Section */}
+        {linkedFolders.length > 0 && (
+          <div className="border-b border-border/40">
+            <div className="px-3 pt-2 pb-1">
+              <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+                Linked Folders
+              </p>
+            </div>
+            <div className="space-y-0.5 px-2 pb-2">
+              {linkedFolders.map((link) => (
+                <div
+                  key={link.id}
+                  className="flex items-center gap-2 rounded-lg p-2 transition-colors hover:bg-muted/50"
+                >
+                  <FolderOpen className="h-4 w-4 shrink-0 text-primary/70" />
+                  <div className="flex-1 overflow-hidden">
+                    <p className="truncate text-sm font-medium">{link.folder.name}</p>
+                    <p className="text-[10px] text-muted-foreground/60">
+                      {link.folder._count.documents} doc{link.folder._count.documents !== 1 ? "s" : ""}
+                      {" · "}
+                      <Badge variant="outline" className="text-[9px] px-1 py-0 inline">
+                        {link.folder.visibility === "PUBLIC" ? "Public" : "Private"}
+                      </Badge>
+                    </p>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 shrink-0 rounded-lg text-muted-foreground hover:text-destructive"
+                    onClick={() => unlinkFolder(link.id, link.folder.name)}
+                    title="Unlink folder"
+                  >
+                    <Unlink className="h-3 w-3" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Project Documents Section */}
+        {documents.length === 0 && linkedFolders.length === 0 ? (
           <div className="flex flex-col items-center justify-center p-6 text-center">
             <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-muted/50">
               <FileText className="h-6 w-6 text-muted-foreground/60" />
             </div>
             <p className="text-sm font-medium">No documents yet</p>
             <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
-              Upload files or drag & drop them here to use as AI context
+              Upload files or link folders to use as AI context
+            </p>
+          </div>
+        ) : documents.length === 0 ? (
+          <div className="flex flex-col items-center justify-center p-4 text-center">
+            <p className="text-xs text-muted-foreground">
+              No project-specific documents. Drag & drop files here to add.
             </p>
           </div>
         ) : (
-          <div className="space-y-0.5 p-2">
-            {documents.map((doc) => {
-              const Icon = getFileIcon(doc.mimeType);
-              return (
-                <div
-                  key={doc.id}
-                  className="flex items-center gap-2 rounded-lg p-2 transition-colors hover:bg-muted/50"
-                >
-                  <Switch
-                    checked={doc.enabled}
-                    onCheckedChange={(checked) => toggleDocument(doc.id, checked)}
-                  />
-                  <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
-                  <div className="flex-1 overflow-hidden">
-                    <a
-                      href={doc.blobUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="block truncate text-sm font-medium hover:underline"
-                    >
-                      {doc.name}
-                    </a>
-                    <p className="text-[10px] text-muted-foreground/60">{doc.mimeType}</p>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7 shrink-0 rounded-lg text-muted-foreground hover:text-destructive"
-                    onClick={() => deleteDocument(doc.id, doc.name)}
+          <>
+            {linkedFolders.length > 0 && (
+              <div className="px-3 pt-2 pb-1">
+                <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+                  Project Documents
+                </p>
+              </div>
+            )}
+            <div className="space-y-0.5 p-2">
+              {documents.map((doc) => {
+                const Icon = getFileIcon(doc.mimeType);
+                return (
+                  <div
+                    key={doc.id}
+                    className="flex items-center gap-2 rounded-lg p-2 transition-colors hover:bg-muted/50"
                   >
-                    <Trash2 className="h-3 w-3" />
-                  </Button>
-                </div>
-              );
-            })}
-          </div>
+                    <Switch
+                      checked={doc.enabled}
+                      onCheckedChange={(checked) => toggleDocument(doc.id, checked)}
+                    />
+                    <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    <div className="flex-1 overflow-hidden">
+                      <a
+                        href={doc.blobUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block truncate text-sm font-medium hover:underline"
+                      >
+                        {doc.name}
+                      </a>
+                      <p className="text-[10px] text-muted-foreground/60">{doc.mimeType}</p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 shrink-0 rounded-lg text-muted-foreground hover:text-destructive"
+                      onClick={() => deleteDocument(doc.id, doc.name)}
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </div>
+                );
+              })}
+            </div>
+          </>
         )}
       </div>
 
       <div className="flex items-center justify-between border-t border-border/40 p-2.5">
         <p className="text-[11px] text-muted-foreground/60">
           {enabledCount} of {documents.length} enabled
+          {linkedFolders.length > 0 && ` · ${linkedFolders.length} folder${linkedFolders.length !== 1 ? "s" : ""} (${totalLinkedDocs} docs)`}
         </p>
         {documents.length > 0 && (
           <div className="flex gap-1">
@@ -239,6 +343,13 @@ export function ContextPanel({ projectId }: { projectId: string }) {
           </div>
         )}
       </div>
+
+      <LinkFolderDialog
+        open={linkDialogOpen}
+        onOpenChange={setLinkDialogOpen}
+        projectId={projectId}
+        onLinked={fetchLinkedFolders}
+      />
     </div>
   );
 }

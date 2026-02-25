@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json();
-  const { name, type, pegaServerUrl, pegaUsername, pegaPassword, githubRepo, githubFolder } = body;
+  const { name, type, pegaServerUrl, pegaUsername, pegaPassword, githubRepo, githubFolder, metadata } = body;
 
   if (!name || !type) {
     return NextResponse.json({ error: "Name and type are required" }, { status: 400 });
@@ -44,6 +44,16 @@ export async function POST(req: NextRequest) {
 
   if (!["COMPONENT", "APPLICATION"].includes(type)) {
     return NextResponse.json({ error: "Invalid project type" }, { status: 400 });
+  }
+
+  // Validate APPLICATION metadata
+  if (type === "APPLICATION" && metadata) {
+    if (!metadata.pegaAppName || !metadata.frontendFramework) {
+      return NextResponse.json(
+        { error: "Pega Application Name and Frontend Framework are required for Application projects" },
+        { status: 400 }
+      );
+    }
   }
 
   // Build folder path based on type
@@ -68,6 +78,7 @@ export async function POST(req: NextRequest) {
       pegaCredentials: encryptedCreds || null,
       githubRepo: githubRepo || null,
       githubFolder: githubFolder || null,
+      metadata: metadata || undefined,
       members: {
         create: {
           userId: session.user.id,

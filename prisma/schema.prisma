@@ -33,6 +33,11 @@ enum PublishStatus {
   FAILED
 }
 
+enum FolderVisibility {
+  PUBLIC
+  PRIVATE
+}
+
 model User {
   id        String   @id @default(cuid())
   email     String   @unique
@@ -44,6 +49,8 @@ model User {
 
   projects       ProjectMember[]
   publishHistory PublishHistory[]
+  createdFolders DocumentFolder[]
+  folderAccess   FolderAccess[]
 }
 
 model Project {
@@ -55,6 +62,7 @@ model Project {
   folderPath      String
   githubRepo      String?
   githubFolder    String?
+  metadata        Json?
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
 
@@ -62,6 +70,7 @@ model Project {
   chatMessages     ChatMessage[]
   contextDocuments ContextDocument[]
   publishHistory   PublishHistory[]
+  folderLinks      ProjectFolderLink[]
 }
 
 model ProjectMember {
@@ -125,4 +134,58 @@ model PublishHistory {
   user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([projectId, createdAt])
+}
+
+model DocumentFolder {
+  id          String           @id @default(cuid())
+  name        String
+  description String?
+  visibility  FolderVisibility @default(PUBLIC)
+  createdById String
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  createdBy    User              @relation(fields: [createdById], references: [id], onDelete: Cascade)
+  documents    GlobalDocument[]
+  accessGrants FolderAccess[]
+  projectLinks ProjectFolderLink[]
+}
+
+model GlobalDocument {
+  id        String   @id @default(cuid())
+  folderId  String
+  name      String
+  filePath  String
+  blobUrl   String
+  mimeType  String
+  fileSize  Int      @default(0)
+  createdAt DateTime @default(now())
+
+  folder DocumentFolder @relation(fields: [folderId], references: [id], onDelete: Cascade)
+
+  @@index([folderId])
+}
+
+model FolderAccess {
+  id        String   @id @default(cuid())
+  folderId  String
+  userId    String
+  createdAt DateTime @default(now())
+
+  folder DocumentFolder @relation(fields: [folderId], references: [id], onDelete: Cascade)
+  user   User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([folderId, userId])
+}
+
+model ProjectFolderLink {
+  id        String   @id @default(cuid())
+  projectId String
+  folderId  String
+  createdAt DateTime @default(now())
+
+  project Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  folder  DocumentFolder @relation(fields: [folderId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, folderId])
 }

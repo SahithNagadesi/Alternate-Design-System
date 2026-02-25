@@ -1,7 +1,7 @@
 {
   "name": "BlueTextBox",
   "label": "Blue Text Box",
-  "description": "A custom text input field with a blue background, built for Pega Constellation.",
+  "description": "A custom text input field with a vibrant blue background and white text, built for Pega Constellation.",
   "organization": "Custom",
   "version": "1.0.0",
   "library": "React",

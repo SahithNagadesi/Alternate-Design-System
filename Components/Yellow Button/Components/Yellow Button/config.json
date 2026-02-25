@@ -1,10 +1,10 @@
 {
-  "name": "YellowButton",
+  "name": "Pega_Custom_YellowButton",
   "label": "Yellow Button - Proceed",
-  "description": "A yellow proceed/action button for Pega Constellation. Designed to be used as a custom DX component within Pega case flows.",
-  "organization": "Custom",
+  "description": "A yellow proceed/action button for Pega Constellation. Fires Pega actions (finishAssignment, navigateToStep, custom) on click. Fully configurable via App Studio.",
+  "organization": "Pega",
   "version": "1.0.0",
-  "library": "YellowButton",
+  "library": "Custom",
   "type": "Component",
   "subtype": "Field",
   "icon": "auto",
@@ -13,7 +13,8 @@
       "name": "label",
       "label": "Button Label",
       "format": "TEXT",
-      "defaultValue": "Proceed"
+      "defaultValue": "Proceed",
+      "required": true
     },
     {
       "name": "disabled",
@@ -46,7 +47,84 @@
       "label": "Visibility",
       "format": "BOOLEAN",
       "defaultValue": true
+    },
+    {
+      "name": "actionType",
+      "label": "Action Type",
+      "format": "TEXT",
+      "defaultValue": "finishAssignment",
+      "allowedValues": [
+        "finishAssignment",
+        "cancelAssignment",
+        "navigateToStep",
+        "openLocalAction",
+        "custom"
+      ]
+    },
+    {
+      "name": "actionParams",
+      "label": "Action Parameters (JSON)",
+      "format": "TEXT",
+      "defaultValue": "{}"
+    },
+    {
+      "name": "testId",
+      "label": "Test ID",
+      "format": "TEXT",
+      "defaultValue": "yellow-proceed-button"
     }
   ],
-  "events": ["onClick"]
+  "events": [
+    {
+      "name": "onClick",
+      "label": "On Click",
+      "description": "Fired when the button is clicked"
+    }
+  ],
+  "presets": [
+    {
+      "name": "ProceedDefault",
+      "label": "Proceed (Default)",
+      "properties": {
+        "label": "Proceed",
+        "size": "medium",
+        "variant": "primary",
+        "showIcon": true,
+        "actionType": "finishAssignment"
+      }
+    },
+    {
+      "name": "ContinueLarge",
+      "label": "Continue (Large)",
+      "properties": {
+        "label": "Continue",
+        "size": "large",
+        "variant": "primary",
+        "showIcon": true,
+        "actionType": "finishAssignment"
+      }
+    },
+    {
+      "name": "NextStepSecondary",
+      "label": "Next Step (Secondary)",
+      "properties": {
+        "label": "Next Step",
+        "size": "medium",
+        "variant": "secondary",
+        "showIcon": true,
+        "actionType": "navigateToStep"
+      }
+    },
+    {
+      "name": "SubmitNoIcon",
+      "label": "Submit (No Icon)",
+      "properties": {
+        "label": "Submit",
+        "size": "medium",
+        "variant": "primary",
+        "showIcon": false,
+        "actionType": "finishAssignment"
+      }
+    }
+  ]
 }

@@ -1,121 +1,98 @@
-import React from "react";
+/**
+ * YellowButton – Presentational Component
+ *
+ * Pure React component with zero Pega dependencies.
+ * All Pega wiring lives in index.tsx (the bridge).
+ */
+
+import { useState, useCallback } from "react";
+import styles from "./YellowButton.module.css";
 
 export interface YellowButtonProps {
   /** Button label text */
   label?: string;
   /** Click handler */
-  onClick?: (event: React.MouseEvent<HTMLButtonElement>) => void;
+  onClick?: (event?: React.MouseEvent<HTMLButtonElement>) => void;
   /** Whether the button is disabled */
   disabled?: boolean;
   /** Button size variant */
   size?: "small" | "medium" | "large";
-  /** Optional custom className */
-  className?: string;
+  /** Colour variant */
+  variant?: "primary" | "secondary";
+  /** Show the forward-arrow icon */
+  showIcon?: boolean;
+  /** data-testid for automation */
+  testId?: string;
 }
 
-const sizeStyles: Record<string, React.CSSProperties> = {
-  small: {
-    padding: "8px 20px",
-    fontSize: "14px",
-  },
-  medium: {
-    padding: "12px 32px",
-    fontSize: "16px",
-  },
-  large: {
-    padding: "16px 44px",
-    fontSize: "18px",
-  },
-};
-
-export const YellowButton: React.FC<YellowButtonProps> = ({
+const YellowButton: React.FC<YellowButtonProps> = ({
   label = "Proceed",
   onClick,
   disabled = false,
   size = "medium",
-  className,
+  variant = "primary",
+  showIcon = true,
+  testId = "yellow-button",
 }) => {
-  const baseStyle: React.CSSProperties = {
-    backgroundColor: disabled ? "#d4c76a" : "#FFD700",
-    color: "#1a1a1a",
-    border: "2px solid #ccac00",
-    borderRadius: "8px",
-    fontWeight: 700,
-    letterSpacing: "0.5px",
-    cursor: disabled ? "not-allowed" : "pointer",
-    transition: "all 0.2s ease-in-out",
-    boxShadow: disabled ? "none" : "0 2px 6px rgba(255, 215, 0, 0.35)",
-    opacity: disabled ? 0.6 : 1,
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: "8px",
-    fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
-    ...sizeStyles[size],
-  };
+  const [pressed, setPressed] = useState(false);
+  const [hovered, setHovered] = useState(false);
 
-  const handleMouseEnter = (e: React.MouseEvent<HTMLButtonElement>) => {
-    if (!disabled) {
-      e.currentTarget.style.backgroundColor = "#FFC800";
-      e.currentTarget.style.boxShadow = "0 4px 12px rgba(255, 215, 0, 0.5)";
-      e.currentTarget.style.transform = "translateY(-1px)";
-    }
-  };
+  // ── Handlers ──
+  const handleClick = useCallback(
+    (e: React.MouseEvent<HTMLButtonElement>) => {
+      if (!disabled) onClick?.(e);
+    },
+    [disabled, onClick]
+  );
 
-  const handleMouseLeave = (e: React.MouseEvent<HTMLButtonElement>) => {
-    if (!disabled) {
-      e.currentTarget.style.backgroundColor = "#FFD700";
-      e.currentTarget.style.boxShadow = "0 2px 6px rgba(255, 215, 0, 0.35)";
-      e.currentTarget.style.transform = "translateY(0)";
-    }
-  };
-
-  const handleMouseDown = (e: React.MouseEvent<HTMLButtonElement>) => {
-    if (!disabled) {
-      e.currentTarget.style.transform = "translateY(1px)";
-      e.currentTarget.style.boxShadow = "0 1px 3px rgba(255, 215, 0, 0.3)";
-    }
-  };
-
-  const handleMouseUp = (e: React.MouseEvent<HTMLButtonElement>) => {
-    if (!disabled) {
-      e.currentTarget.style.transform = "translateY(-1px)";
-      e.currentTarget.style.boxShadow = "0 4px 12px rgba(255, 215, 0, 0.5)";
-    }
-  };
+  // ── Compute CSS class list ──
+  const classList = [
+    styles.yellowButton,
+    styles[size],
+    styles[variant],
+    disabled ? styles.disabled : "",
+    hovered && !disabled ? styles.hovered : "",
+    pressed && !disabled ? styles.pressed : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   return (
     <button
       type="button"
-      style={baseStyle}
-      onClick={onClick}
+      className={classList}
+      onClick={handleClick}
       disabled={disabled}
-      className={className}
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
-      onMouseDown={handleMouseDown}
-      onMouseUp={handleMouseUp}
+      data-testid={testId}
       aria-label={label}
+      aria-disabled={disabled}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => {
+        setHovered(false);
+        setPressed(false);
+      }}
+      onMouseDown={() => setPressed(true)}
+      onMouseUp={() => setPressed(false)}
     >
-      {/* Arrow / Proceed icon */}
-      <span style={{ display: "inline-flex", alignItems: "center" }}>
-        {label}
-      </span>
-      <svg
-        width="18"
-        height="18"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        style={{ flexShrink: 0 }}
-        aria-hidden="true"
-      >
-        <line x1="5" y1="12" x2="19" y2="12" />
-        <polyline points="13 6 19 12 13 18" />
-      </svg>
+      <span className={styles.label}>{label}</span>
+
+      {showIcon && (
+        <svg
+          className={styles.icon}
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <line x1="5" y1="12" x2="19" y2="12" />
+          <polyline points="13 6 19 12 13 18" />
+        </svg>
+      )}
     </button>
   );
 };

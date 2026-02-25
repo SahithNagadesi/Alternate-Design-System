@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import {
   Input,
   FieldValueList,
@@ -8,11 +8,18 @@ import {
 import StyledBlueTextBoxWrapper from "./styles";
 import handleEvent from "./event-handler";
 
+/**
+ * BlueTextBox — A custom Pega Constellation text input
+ * with a vibrant blue background and white text.
+ *
+ * Supports edit mode, display-only mode, labels-left mode,
+ * validation messages, and full Pega DX API integration.
+ */
 export default function BlueTextBox(props) {
   const {
     getPConnect,
     value = "",
-    placeholder = "",
+    placeholder = "Enter text...",
     disabled = false,
     readOnly = false,
     required = false,
@@ -33,68 +40,74 @@ export default function BlueTextBox(props) {
   const [inputValue, setInputValue] = useState(value);
   const inputRef = useRef(null);
 
-  // Sync with Pega value
+  // Keep local state in sync with Pega store value
   useEffect(() => {
     setInputValue(value);
   }, [value]);
 
-  // Handle change event
-  const handleChange = (event) => {
-    const newValue = event.target.value;
-    setInputValue(newValue);
+  // Handle input change — update local state immediately for responsive typing
+  const handleChange = useCallback(
+    (event) => {
+      const newValue = event.target.value;
+      setInputValue(newValue);
 
-    if (onChange) {
-      onChange(event);
-    }
-  };
+      if (onChange) {
+        onChange(event);
+      }
+    },
+    [onChange]
+  );
 
-  // Handle blur - update Pega store
-  const handleBlur = (event) => {
-    const newValue = event.target.value;
+  // Handle blur — persist value to Pega store and trigger validation
+  const handleBlur = useCallback(
+    (event) => {
+      const newValue = event.target.value;
+      handleEvent(actions, "changeNblur", propName, newValue);
 
-    handleEvent(actions, "changeNblur", propName, newValue);
+      if (onBlur) {
+        onBlur(event);
+      }
+    },
+    [actions, propName, onBlur]
+  );
 
-    if (onBlur) {
-      onBlur(event);
-    }
-  };
-
-  // ----- Display Mode (Read-Only View) -----
-  if (displayMode === "LABELS_LEFT" || displayMode === "DISPLAY_ONLY") {
+  // ───────── Display Mode: LABELS_LEFT ─────────
+  if (displayMode === "LABELS_LEFT") {
     const displayValue = value || "---";
-
-    if (displayMode === "LABELS_LEFT") {
-      return (
-        <StyledBlueTextBoxWrapper>
-          <FieldValueList
-            variant="stacked"
-            data-testid={testId}
-            fields={[
-              {
-                id: "1",
-                name: hideLabel ? "" : label,
-                value: (
-                  <Text variant="h1" as="span">
-                    {displayValue}
-                  </Text>
-                ),
-              },
-            ]}
-          />
-        </StyledBlueTextBoxWrapper>
-      );
-    }
-
     return (
-      <StyledBlueTextBoxWrapper>
-        <Text variant="h1" as="span" data-testid={testId}>
+      <StyledBlueTextBoxWrapper data-testid={testId}>
+        <FieldValueList
+          variant="stacked"
+          data-testid={`${testId}-field-list`}
+          fields={[
+            {
+              id: "1",
+              name: hideLabel ? "" : label,
+              value: (
+                <Text variant="h1" as="span">
+                  {displayValue}
+                </Text>
+              ),
+            },
+          ]}
+        />
+      </StyledBlueTextBoxWrapper>
+    );
+  }
+
+  // ───────── Display Mode: DISPLAY_ONLY ─────────
+  if (displayMode === "DISPLAY_ONLY") {
+    const displayValue = value || "---";
+    return (
+      <StyledBlueTextBoxWrapper data-testid={testId}>
+        <Text variant="h1" as="span" data-testid={`${testId}-display`}>
           {displayValue}
         </Text>
       </StyledBlueTextBoxWrapper>
     );
   }
 
-  // ----- Edit Mode -----
+  // ───────── Edit Mode ─────────
   const hasError = !!validatemessage;
 
   return (
@@ -113,6 +126,9 @@ export default function BlueTextBox(props) {
         value={inputValue}
         onChange={handleChange}
         onBlur={handleBlur}
+        aria-label={hideLabel ? label : undefined}
+        aria-invalid={hasError}
+        aria-required={required}
       />
     </StyledBlueTextBoxWrapper>
   );
@@ -120,7 +136,7 @@ export default function BlueTextBox(props) {
 
 BlueTextBox.defaultProps = {
   value: "",
-  placeholder: "",
+  placeholder: "Enter text...",
   disabled: false,
   readOnly: false,
   required: false,

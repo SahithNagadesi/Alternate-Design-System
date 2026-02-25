@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pega Case Creator — Alternate Design System</title>
+  <link rel="stylesheet" href="css/styles.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+</head>
+<body>
+  <!-- ============ HEADER / NAV ============ -->
+  <header class="header">
+    <div class="header__inner container">
+      <div class="header__brand">
+        <svg class="header__logo" viewBox="0 0 32 32" width="32" height="32">
+          <rect rx="6" width="32" height="32" fill="#4361EE" />
+          <text x="50%" y="55%" text-anchor="middle" dominant-baseline="middle"
+                fill="#fff" font-size="16" font-weight="700" font-family="Inter,sans-serif">P</text>
+        </svg>
+        <span class="header__title">Pega Case Creator</span>
+      </div>
+      <nav class="header__nav">
+        <span class="header__status" id="connectionStatus">
+          <span class="status-dot status-dot--disconnected"></span>
+          Disconnected
+        </span>
+      </nav>
+    </div>
+  </header>
+
+  <!-- ============ HERO ============ -->
+  <section class="hero">
+    <div class="container">
+      <h1 class="hero__heading">Create Cases with<br /><span class="gradient-text">Pega DX API</span></h1>
+      <p class="hero__sub">
+        Connect to your Pega Infinity&trade; environment, browse available case types, and
+        create new cases — all from this lightweight Alternate Design System.
+      </p>
+    </div>
+  </section>
+
+  <!-- ============ CONNECTION PANEL ============ -->
+  <section class="section" id="connectionSection">
+    <div class="container container--narrow">
+      <div class="card card--highlight">
+        <h2 class="card__title">🔗 Connect to Pega</h2>
+        <p class="card__desc">Enter your Pega Infinity server details and credentials to get started.</p>
+
+        <form id="connectionForm" class="form" autocomplete="off">
+          <div class="form__group">
+            <label class="form__label" for="serverUrl">Server URL</label>
+            <input class="form__input" id="serverUrl" type="url"
+                   placeholder="https://your-pega-server.com/prweb" required />
+            <span class="form__hint">Base URL of your Pega instance (e.g. https://host/prweb)</span>
+          </div>
+
+          <div class="form__row">
+            <div class="form__group">
+              <label class="form__label" for="username">Username</label>
+              <input class="form__input" id="username" type="text" placeholder="operator_id" required />
+            </div>
+            <div class="form__group">
+              <label class="form__label" for="password">Password</label>
+              <input class="form__input" id="password" type="password" placeholder="••••••••" required />
+            </div>
+          </div>
+
+          <button class="btn btn--primary btn--block" type="submit" id="connectBtn">
+            <span class="btn__text">Connect</span>
+            <span class="btn__loader hidden" id="connectLoader"></span>
+          </button>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ CASE TYPES ============ -->
+  <section class="section hidden" id="caseTypesSection">
+    <div class="container">
+      <h2 class="section__title">Available Case Types</h2>
+      <p class="section__sub">Select a case type below to create a new case.</p>
+
+      <div class="grid" id="caseTypesGrid">
+        <!-- Populated dynamically -->
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ CREATE CASE MODAL ============ -->
+  <div class="modal-overlay hidden" id="modalOverlay">
+    <div class="modal" role="dialog" aria-modal="true" id="createCaseModal">
+      <button class="modal__close" id="modalCloseBtn" aria-label="Close">&times;</button>
+      <h2 class="modal__title" id="modalTitle">Create New Case</h2>
+      <p class="modal__desc" id="modalDesc">Fill in the details to create a new case.</p>
+
+      <form id="createCaseForm" class="form">
+        <div id="caseFieldsContainer">
+          <!-- Dynamic fields rendered here -->
+        </div>
+
+        <div class="form__actions">
+          <button type="button" class="btn btn--outline" id="modalCancelBtn">Cancel</button>
+          <button type="submit" class="btn btn--primary" id="submitCaseBtn">
+            <span class="btn__text">Create Case</span>
+            <span class="btn__loader hidden" id="createLoader"></span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ============ TOAST ============ -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <!-- ============ CREATED CASES TABLE ============ -->
+  <section class="section hidden" id="createdCasesSection">
+    <div class="container">
+      <h2 class="section__title">Recently Created Cases</h2>
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Case ID</th>
+              <th>Case Type</th>
+              <th>Status</th>
+              <th>Created At</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="createdCasesBody">
+            <!-- Populated dynamically -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ FOOTER ============ -->
+  <footer class="footer">
+    <div class="container">
+      <p>&copy; 2024 Pega Alternate Design System &middot; Built with DX API v2</p>
+    </div>
+  </footer>
+
+  <!-- Scripts -->
+  <script src="js/pegaApi.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

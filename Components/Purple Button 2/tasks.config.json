@@ -1,0 +1,16 @@
+{
+  "platform": "25",
+  "components": [
+    {
+      "organization": "Omnicom",
+      "library": "DemoLibrary",
+      "component": "PurpleButton",
+      "type": "FIELD",
+      "subtype": "Text",
+      "version": "01.01.01",
+      "ruleset": "CustomDXComponents",
+      "rulesetVersion": "01-01-01",
+      "libraryMode": true
+    }
+  ]
+}

@@ -1,0 +1,54 @@
+{
+  "name": "PurpleButton",
+  "label": "PurpleButton",
+  "description": "PurpleButton component",
+  "organization": "Omnicom",
+  "library": "DemoLibrary",
+  "version": "01.01.01",
+  "type": "FIELD",
+  "subtype": "Text",
+  "properties": [
+    {
+      "name": "label",
+      "label": "Label",
+      "type": "string",
+      "defaultValue": ""
+    },
+    {
+      "name": "required",
+      "label": "Required",
+      "type": "boolean",
+      "defaultValue": false
+    },
+    {
+      "name": "disabled",
+      "label": "Disabled",
+      "type": "boolean",
+      "defaultValue": false
+    },
+    {
+      "name": "readOnly",
+      "label": "Read Only",
+      "type": "boolean",
+      "defaultValue": false
+    },
+    {
+      "name": "value",
+      "label": "Value",
+      "type": "string",
+      "defaultValue": ""
+    },
+    {
+      "name": "placeholder",
+      "label": "Placeholder",
+      "type": "string",
+      "defaultValue": ""
+    },
+    {
+      "name": "helperText",
+      "label": "Helper Text",
+      "type": "string",
+      "defaultValue": ""
+    }
+  ]
+}

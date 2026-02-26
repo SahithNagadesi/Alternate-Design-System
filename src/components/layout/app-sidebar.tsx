@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { LayoutDashboard, Users, Settings, FolderKanban, PanelLeftClose, PanelLeft, Library } from "lucide-react";
+import { LayoutDashboard, Users, Settings, FolderKanban, PanelLeftClose, PanelLeft, Library, Home } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
 const navItems = [
+  { href: "/home", label: "Home", icon: Home },
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/documents", label: "Documents", icon: Library },
   { href: "/admin/users", label: "Admin Users", icon: Users, adminOnly: true },
@@ -33,14 +34,14 @@ export function AppSidebar({ collapsed, onToggle }: AppSidebarProps) {
     >
       <div className="flex h-14 items-center border-b border-sidebar-border/50 px-4">
         {!collapsed ? (
-          <Link href="/dashboard" className="flex items-center gap-2.5 group">
+          <Link href="/home" className="flex items-center gap-2.5 group">
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-primary/80 shadow-md transition-transform group-hover:scale-105">
               <FolderKanban className="h-5 w-5 text-primary-foreground" />
             </div>
             <span className="text-lg font-bold tracking-tight text-foreground">Frontier XD</span>
           </Link>
         ) : (
-          <Link href="/dashboard" className="mx-auto flex items-center justify-center group">
+          <Link href="/home" className="mx-auto flex items-center justify-center group">
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-primary/80 shadow-md transition-transform group-hover:scale-105">
               <FolderKanban className="h-5 w-5 text-primary-foreground" />
             </div>

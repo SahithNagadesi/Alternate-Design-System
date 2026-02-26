@@ -56,6 +56,28 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // Validate COMPONENT metadata
+  if (type === "COMPONENT" && metadata) {
+    if (!metadata.organizationName || !metadata.libraryName || !metadata.componentName) {
+      return NextResponse.json(
+        { error: "Organization Name, Library Name, and Component Name are required for Component projects" },
+        { status: 400 }
+      );
+    }
+    if (!metadata.componentType || !metadata.componentSubtype) {
+      return NextResponse.json(
+        { error: "Component Type and Subtype are required for Component projects" },
+        { status: 400 }
+      );
+    }
+    if (!["Field", "Template", "Widget"].includes(metadata.componentType)) {
+      return NextResponse.json(
+        { error: "Component Type must be Field, Template, or Widget" },
+        { status: 400 }
+      );
+    }
+  }
+
   // Build folder path based on type
   const folder = type === "COMPONENT" ? "Components" : "Applications";
   const safeName = name.replace(/[^a-zA-Z0-9-_ ]/g, "").trim();

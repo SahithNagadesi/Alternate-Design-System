@@ -22,9 +22,23 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Trash2, UserPlus, Crown, User } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Trash2, UserPlus, Crown, User, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
-import type { ApplicationMetadata } from "@/types/project-metadata";
+import type { ApplicationMetadata, ComponentMetadata } from "@/types/project-metadata";
+
+const COMPONENT_SUBTYPES: Record<string, string[]> = {
+  Field: [
+    "Text", "TextInput", "Integer", "Decimal", "Currency", "Percentage",
+    "Boolean", "Date", "DateTime", "TimeOfDay", "Email", "Phone", "URL",
+    "Picklist", "RadioButtons", "TextArea", "RichText", "Checkbox",
+    "AutoComplete", "Attachment",
+  ],
+  Template: [
+    "FORM", "PAGE", "DETAILS", "DASHBOARD", "TAB", "LIST", "DATAVIEW", "OBJECTVIEW",
+  ],
+  Widget: ["CASE", "PAGE", "PAGE & CASE"],
+};
 
 interface Project {
   id: string;
@@ -32,7 +46,7 @@ interface Project {
   type: "COMPONENT" | "APPLICATION";
   pegaServerUrl: string | null;
   folderPath: string;
-  metadata?: ApplicationMetadata | null;
+  metadata?: ApplicationMetadata | ComponentMetadata | null;
   members: Array<{
     role: string;
     user: { id: string; name: string; email: string };
@@ -82,7 +96,28 @@ export function ProjectSettingsDialog({
   });
   const [savingMetadata, setSavingMetadata] = useState(false);
 
+  // Component Config state (COMPONENT projects only)
+  const [compMetadata, setCompMetadata] = useState<ComponentMetadata>({
+    organizationName: "",
+    libraryName: "",
+    componentName: "",
+    componentVersion: "01.01.01",
+    projectDescription: "",
+    componentType: "Field",
+    componentSubtype: "TextInput",
+    dxcbVersion: "25.1.10",
+    pegaPlatformVersion: "25",
+    libraryMode: true,
+    rulesetName: "",
+    rulesetVersion: "",
+    oauthGrantType: "",
+    clientId: "",
+  });
+  const [savingCompMetadata, setSavingCompMetadata] = useState(false);
+  const [showAdvancedSettings, setShowAdvancedSettings] = useState(false);
+
   const isApplication = project.type === "APPLICATION";
+  const isComponent = project.type === "COMPONENT";
 
   useEffect(() => {
     if (open) {
@@ -90,14 +125,34 @@ export function ProjectSettingsDialog({
       setPegaServerUrl(project.pegaServerUrl || "");
       fetchMembers();
       if (isApplication && project.metadata) {
+        const meta = project.metadata as ApplicationMetadata;
         setAppMetadata({
-          frontendFramework: project.metadata.frontendFramework || "",
-          frontendFrameworkOther: project.metadata.frontendFrameworkOther || "",
-          pegaAppName: project.metadata.pegaAppName || "",
-          caseTypes: project.metadata.caseTypes || "",
-          dxApiVersion: project.metadata.dxApiVersion || "24.1",
-          dxApiAuthMethod: project.metadata.dxApiAuthMethod || "Basic",
-          dxApiEndpoints: project.metadata.dxApiEndpoints || "",
+          frontendFramework: meta.frontendFramework || "",
+          frontendFrameworkOther: meta.frontendFrameworkOther || "",
+          pegaAppName: meta.pegaAppName || "",
+          caseTypes: meta.caseTypes || "",
+          dxApiVersion: meta.dxApiVersion || "24.1",
+          dxApiAuthMethod: meta.dxApiAuthMethod || "Basic",
+          dxApiEndpoints: meta.dxApiEndpoints || "",
+        });
+      }
+      if (isComponent && project.metadata) {
+        const meta = project.metadata as ComponentMetadata;
+        setCompMetadata({
+          organizationName: meta.organizationName || "",
+          libraryName: meta.libraryName || "",
+          componentName: meta.componentName || "",
+          componentVersion: meta.componentVersion || "01.01.01",
+          projectDescription: meta.projectDescription || "",
+          componentType: meta.componentType || "Field",
+          componentSubtype: meta.componentSubtype || "TextInput",
+          dxcbVersion: meta.dxcbVersion || "25.1.10",
+          pegaPlatformVersion: meta.pegaPlatformVersion || "25",
+          libraryMode: meta.libraryMode !== false,
+          rulesetName: meta.rulesetName || "",
+          rulesetVersion: meta.rulesetVersion || "",
+          oauthGrantType: meta.oauthGrantType || "",
+          clientId: meta.clientId || "",
         });
       }
     }
@@ -240,9 +295,31 @@ export function ProjectSettingsDialog({
     }
   }
 
+  async function handleSaveCompMetadata(e: React.FormEvent) {
+    e.preventDefault();
+    setSavingCompMetadata(true);
+
+    try {
+      const res = await fetch(`/api/projects/${project.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ metadata: compMetadata }),
+      });
+
+      if (!res.ok) throw new Error("Failed to update");
+
+      toast.success("Component configuration updated");
+      onUpdated();
+    } catch {
+      toast.error("Failed to update component configuration");
+    } finally {
+      setSavingCompMetadata(false);
+    }
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Project Settings</DialogTitle>
           <DialogDescription>
@@ -251,9 +328,10 @@ export function ProjectSettingsDialog({
         </DialogHeader>
 
         <Tabs defaultValue="general" className="w-full">
-          <TabsList className={`grid w-full ${isApplication ? "grid-cols-3" : "grid-cols-2"}`}>
+          <TabsList className={`grid w-full ${isApplication || isComponent ? "grid-cols-3" : "grid-cols-2"}`}>
             <TabsTrigger value="general">General</TabsTrigger>
             {isApplication && <TabsTrigger value="appconfig">App Config</TabsTrigger>}
+            {isComponent && <TabsTrigger value="compconfig">Component Config</TabsTrigger>}
             <TabsTrigger value="members">Members ({members.length})</TabsTrigger>
           </TabsList>
 
@@ -446,6 +524,231 @@ export function ProjectSettingsDialog({
                   </Button>
                   <Button type="submit" disabled={savingMetadata}>
                     {savingMetadata ? "Saving..." : "Save Config"}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </TabsContent>
+          )}
+
+          {isComponent && (
+            <TabsContent value="compconfig">
+              <form onSubmit={handleSaveCompMetadata} className="space-y-4">
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="settings-org">Organization</Label>
+                    <Input
+                      id="settings-org"
+                      value={compMetadata.organizationName}
+                      onChange={(e) => setCompMetadata({ ...compMetadata, organizationName: e.target.value })}
+                      placeholder="e.g. MyOrg"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="settings-lib">Library</Label>
+                    <Input
+                      id="settings-lib"
+                      value={compMetadata.libraryName}
+                      onChange={(e) => setCompMetadata({ ...compMetadata, libraryName: e.target.value })}
+                      placeholder="e.g. MyLib"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="settings-comp">Component</Label>
+                    <Input
+                      id="settings-comp"
+                      value={compMetadata.componentName}
+                      onChange={(e) => setCompMetadata({ ...compMetadata, componentName: e.target.value })}
+                      placeholder="e.g. MyField"
+                      required
+                    />
+                  </div>
+                </div>
+
+                {compMetadata.organizationName && compMetadata.libraryName && compMetadata.componentName && (
+                  <p className="text-xs text-muted-foreground">
+                    Full Key: <code className="bg-muted px-1 rounded">{compMetadata.organizationName}_{compMetadata.libraryName}_{compMetadata.componentName}</code>
+                  </p>
+                )}
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="settings-comp-version">Version</Label>
+                    <Input
+                      id="settings-comp-version"
+                      value={compMetadata.componentVersion}
+                      onChange={(e) => setCompMetadata({ ...compMetadata, componentVersion: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="settings-comp-desc">Description</Label>
+                    <Input
+                      id="settings-comp-desc"
+                      value={compMetadata.projectDescription || ""}
+                      onChange={(e) => setCompMetadata({ ...compMetadata, projectDescription: e.target.value })}
+                      placeholder="Optional"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="settings-comp-type">Component Type</Label>
+                    <Select
+                      value={compMetadata.componentType}
+                      onValueChange={(val) => {
+                        const subtypes = COMPONENT_SUBTYPES[val] || [];
+                        setCompMetadata({ ...compMetadata, componentType: val, componentSubtype: subtypes[0] || "" });
+                      }}
+                    >
+                      <SelectTrigger id="settings-comp-type">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Field">Field</SelectItem>
+                        <SelectItem value="Template">Template</SelectItem>
+                        <SelectItem value="Widget">Widget</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="settings-comp-subtype">Subtype</Label>
+                    <Select
+                      value={compMetadata.componentSubtype}
+                      onValueChange={(val) => setCompMetadata({ ...compMetadata, componentSubtype: val })}
+                    >
+                      <SelectTrigger id="settings-comp-subtype">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {(COMPONENT_SUBTYPES[compMetadata.componentType] || []).map((sub) => (
+                          <SelectItem key={sub} value={sub}>{sub}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="settings-dxcb">DXCB Version</Label>
+                    <Select
+                      value={compMetadata.dxcbVersion}
+                      onValueChange={(val) => setCompMetadata({ ...compMetadata, dxcbVersion: val })}
+                    >
+                      <SelectTrigger id="settings-dxcb">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="25.1.10">25.1.10</SelectItem>
+                        <SelectItem value="24.2.10">24.2.10</SelectItem>
+                        <SelectItem value="24.1.10">24.1.10</SelectItem>
+                        <SelectItem value="23.1.10">23.1.10</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="settings-platform">Pega Platform</Label>
+                    <Select
+                      value={compMetadata.pegaPlatformVersion}
+                      onValueChange={(val) => setCompMetadata({ ...compMetadata, pegaPlatformVersion: val })}
+                    >
+                      <SelectTrigger id="settings-platform">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="25">Pega &apos;25</SelectItem>
+                        <SelectItem value="24.2">24.2</SelectItem>
+                        <SelectItem value="24.1">24.1</SelectItem>
+                        <SelectItem value="23.1">23.1</SelectItem>
+                        <SelectItem value="8.8">8.8</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between rounded-md border p-2">
+                  <div>
+                    <Label htmlFor="settings-lib-mode" className="text-sm">Library Mode</Label>
+                    <p className="text-xs text-muted-foreground">Default for Pega &apos;25+</p>
+                  </div>
+                  <Switch
+                    id="settings-lib-mode"
+                    checked={compMetadata.libraryMode}
+                    onCheckedChange={(checked) => setCompMetadata({ ...compMetadata, libraryMode: checked })}
+                  />
+                </div>
+
+                {/* Advanced Section */}
+                <button
+                  type="button"
+                  className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                  onClick={() => setShowAdvancedSettings(!showAdvancedSettings)}
+                >
+                  <ChevronDown className={`h-3 w-3 transition-transform ${showAdvancedSettings ? "rotate-180" : ""}`} />
+                  Advanced
+                </button>
+
+                {showAdvancedSettings && (
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-2">
+                        <Label htmlFor="settings-ruleset">Ruleset Name</Label>
+                        <Input
+                          id="settings-ruleset"
+                          value={compMetadata.rulesetName || ""}
+                          onChange={(e) => setCompMetadata({ ...compMetadata, rulesetName: e.target.value })}
+                          placeholder="e.g. CustomDXComponents"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="settings-ruleset-ver">Ruleset Version</Label>
+                        <Input
+                          id="settings-ruleset-ver"
+                          value={compMetadata.rulesetVersion || ""}
+                          onChange={(e) => setCompMetadata({ ...compMetadata, rulesetVersion: e.target.value })}
+                          placeholder="e.g. 01-01-01"
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-2">
+                        <Label htmlFor="settings-oauth">OAuth Grant Type</Label>
+                        <Select
+                          value={compMetadata.oauthGrantType || "__none__"}
+                          onValueChange={(v) => setCompMetadata({ ...compMetadata, oauthGrantType: v === "__none__" ? "" : v })}
+                        >
+                          <SelectTrigger id="settings-oauth">
+                            <SelectValue placeholder="None" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__none__">None</SelectItem>
+                            <SelectItem value="authCode">Authorization Code</SelectItem>
+                            <SelectItem value="passwordCreds">Password Credentials</SelectItem>
+                            <SelectItem value="clientCreds">Client Credentials</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="settings-client-id">Client ID</Label>
+                        <Input
+                          id="settings-client-id"
+                          value={compMetadata.clientId || ""}
+                          onChange={(e) => setCompMetadata({ ...compMetadata, clientId: e.target.value })}
+                          placeholder="OAuth 2.0 Client ID"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <DialogFooter>
+                  <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                    Cancel
+                  </Button>
+                  <Button type="submit" disabled={savingCompMetadata}>
+                    {savingCompMetadata ? "Saving..." : "Save Config"}
                   </Button>
                 </DialogFooter>
               </form>

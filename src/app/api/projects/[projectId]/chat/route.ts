@@ -43,21 +43,130 @@ When context documents are provided, use them as reference material for your ans
 
 const CONSTELLATION_ADDENDUM = `
 
-IMPORTANT — Pega Constellation Component Development:
-This project is a Pega Constellation custom DX component. Follow these guidelines:
+IMPORTANT — Pega Constellation DX Component Builder (DXCB) Knowledge:
 
-- Use PConnect APIs (getPConnectOfActiveContainerItem, getComponentName, etc.) for data binding.
-- Build with Cosmos React components (@pega/cosmos-react-core, @pega/cosmos-react-work, etc.) for consistent styling.
-- Follow the standard Constellation component file structure:
-  - index.ts (exports)
-  - config.json (component metadata, properties, and events)
-  - <ComponentName>.tsx (main component)
-  - <ComponentName>.styles.ts (styled-components)
-  - demo.stories.tsx (Storybook story)
-- In config.json, declare properties using Pega types (Text, Boolean, Integer, etc.) and define events.
-- Use \`getPConnect().getValue('.PropertyName')\` for reading case data and \`getPConnect().setValue('.PropertyName', value)\` for writing.
-- Ensure components handle loading, error, and empty states gracefully.
-- Use Pega design tokens for colors, spacing, and typography where possible.
+## Project Structure
+A DXCB project is scaffolded with \`npx @pega/custom-dx-components create\` and uses tasks.config.json
+for build configuration. Key directories:
+- src/components/<Org_Lib_CompName>/ — component source
+- src/components/<Org_Lib_CompName>/demo.stories.tsx — Storybook stories
+- tasks.config.json — project-level config (organization, library, version, components list)
+
+## Component File Structure
+Each component folder contains:
+- index.ts — re-exports the component
+- config.json — metadata, properties, events, and type/subtype declarations
+- <ComponentName>.tsx — main React component receiving PConnect
+- <ComponentName>.styles.ts — styled-components with theme access
+- demo.stories.tsx — Storybook story for local development
+
+## Component Types and Subtypes
+- **Field** subtypes: Text, TextInput, Integer, Decimal, Currency, Percentage, Boolean, Date, DateTime,
+  TimeOfDay, Email, Phone, URL, Picklist, RadioButtons, TextArea, RichText, Checkbox, AutoComplete, Attachment
+- **Template** subtypes: FORM, PAGE, DETAILS, DASHBOARD, TAB, LIST, DATAVIEW, OBJECTVIEW
+- **Widget** subtypes: CASE, PAGE, PAGE & CASE
+
+## config.json Schema
+\`\`\`json
+{
+  "name": "Org_Lib_CompName",
+  "label": "Component Label",
+  "description": "...",
+  "organization": "Org",
+  "version": "1.0.0",
+  "library": "Lib",
+  "type": "Field",
+  "subtype": "TextInput",
+  "icon": "auto",
+  "properties": [
+    {
+      "name": "label",
+      "label": "Label",
+      "format": "TEXT"
+    },
+    {
+      "name": "value",
+      "label": "Value",
+      "format": "TEXT",
+      "binding": true
+    }
+  ],
+  "events": []
+}
+\`\`\`
+
+## Property Formats
+TEXT, BOOLEAN, INTEGER, DECIMAL, SELECT, GROUP, VISIBILITY (evaluates to show/hide),
+DISABLED, READONLY, REQUIRED, DATE, DATETIME, TIME, RICHTEXT, URL, EMAIL, PHONE, CURRENCY,
+PERCENTAGE, DATASOURCE, CASE, CLASSPATH
+
+## Key Annotations in Property Values
+- @P — property reference (e.g. @P .FirstName)
+- @L — localization key
+- @DATASOURCE — data source reference
+- @CASE — case reference
+- @E — expression
+- @ENV — environment variable
+- @W — widget reference
+
+## PConnect API Methods
+Essential PConnect methods available on \`getPConnect()\`:
+- \`getValue(propertyRef)\` — read a case property (.PropertyName)
+- \`setValue(propertyRef, value)\` — write a case property
+- \`getConfigProps()\` — get all configured properties from config.json
+- \`getChildren()\` — get child PConnect objects (for Templates)
+- \`getComponentName()\` — returns the component type name
+- \`getCaseInfo()\` — get current case information
+- \`getDataObject(dataRef)\` — read data page/object
+- \`getActionsApi()\` — access case actions (openWorkByHandle, openAssignment, etc.)
+- \`getValidationApi()\` — field validation
+- \`resolveConfigProps(props)\` — resolve @P, @L, @E annotations to actual values
+- \`createComponent(config)\` — dynamically render a child component
+- \`getContextName()\`, \`getTarget()\`, \`getPageReference()\`
+
+## Key NPM Packages
+- @pega/cosmos-react-core — base UI components (Button, Card, Input, Text, Icon, etc.)
+- @pega/cosmos-react-work — work-specific (Assignment, CaseView, CaseSummary, etc.)
+- @pega/cosmos-react-condition — conditional rendering
+- @pega/cosmos-react-template — template components
+- @pega/pcore-pconnect-typedefs — TypeScript types for PConnect
+- @pega/custom-dx-components — CLI tool and build system
+
+## Cosmos React Component Usage
+Import from @pega/cosmos-react-core:
+\`\`\`tsx
+import { Input, Button, Card, Text, Icon, registerIcon } from '@pega/cosmos-react-core';
+\`\`\`
+
+## Styled-Components Pattern
+\`\`\`tsx
+import styled, { css } from 'styled-components';
+
+export const StyledWrapper = styled.div(({ theme }) => css\\\`
+  padding: \${theme.base.spacing};
+  color: \${theme.base.palette['primary-foreground']};
+  border: 1px solid \${theme.base.colors['border']};
+\\\`);
+\`\`\`
+
+## Pega Platform Compatibility
+- Pega '25 — DXCB 25.x, library mode default
+- Pega 24.2 — DXCB 24.2.x
+- Pega 24.1 — DXCB 24.1.x
+- Pega 23.1 — DXCB 23.1.x
+- Pega 8.8 — DXCB 23.1.x (backward compatible)
+
+## Best Practices
+- Always use PConnect for data binding; never hardcode case data
+- Use Cosmos React components for visual consistency with Constellation
+- Declare all user-facing properties in config.json with proper formats
+- Handle loading, error, and empty states gracefully
+- Use Pega design tokens from theme for colors, spacing, typography
+- For Fields: focus on value binding and validation
+- For Templates: render children via getPConnect().getChildren()
+- For Widgets: self-contained UI with own data fetching
+- Use \`resolveConfigProps()\` to handle dynamic @P/@L/@E values
+- Write demo.stories.tsx for every component for local Storybook testing
 `;
 
 const STORYBOOK_ADDENDUM = `
@@ -206,6 +315,75 @@ DX API Integration Guidelines:
 - Always handle API errors gracefully with proper error states in the UI.
 - Use the case types (${caseTypes}) when creating new work items or querying cases.
 - Implement proper CORS handling when connecting from ${framework} frontend to Pega server.`;
+
+  return ctx;
+}
+
+function buildComponentContext(metadata: Record<string, unknown> | null): string {
+  if (!metadata) return "";
+
+  const org = (metadata.organizationName as string) || "Not specified";
+  const lib = (metadata.libraryName as string) || "Not specified";
+  const comp = (metadata.componentName as string) || "Not specified";
+  const version = (metadata.componentVersion as string) || "01.01.01";
+  const compType = (metadata.componentType as string) || "Field";
+  const compSubtype = (metadata.componentSubtype as string) || "TextInput";
+  const dxcb = (metadata.dxcbVersion as string) || "25.1.10";
+  const platform = (metadata.pegaPlatformVersion as string) || "25";
+  const libMode = metadata.libraryMode !== false;
+  const ruleset = (metadata.rulesetName as string) || "";
+  const rulesetVer = (metadata.rulesetVersion as string) || "";
+  const oauth = (metadata.oauthGrantType as string) || "";
+  const clientIdVal = (metadata.clientId as string) || "";
+  const description = (metadata.projectDescription as string) || "";
+
+  let ctx = `
+
+IMPORTANT — Component Project Context:
+- Organization: ${org}
+- Library: ${lib}
+- Component Name: ${comp}
+- Full Key: ${org}_${lib}_${comp}
+- Version: ${version}
+- Type: ${compType}
+- Subtype: ${compSubtype}
+- DXCB Version: ${dxcb}
+- Pega Platform: ${platform}
+- Library Mode: ${libMode ? "Yes" : "No"}`;
+
+  if (description) ctx += `\n- Description: ${description}`;
+  if (ruleset) ctx += `\n- Ruleset: ${ruleset}${rulesetVer ? ` v${rulesetVer}` : ""}`;
+  if (oauth) ctx += `\n- OAuth Grant Type: ${oauth}`;
+  if (clientIdVal) ctx += `\n- Client ID: ${clientIdVal}`;
+
+  // Type-specific guidance
+  if (compType === "Field") {
+    ctx += `
+
+Field Component Guidance:
+- Focus on value binding: use getPConnect().getValue('.PropertyName') and setValue()
+- Implement proper validation via getValidationApi()
+- Subtype "${compSubtype}" should match the expected input/display behavior
+- Declare a "value" property with binding:true in config.json
+- Handle readOnly, disabled, required states from PConnect`;
+  } else if (compType === "Template") {
+    ctx += `
+
+Template Component Guidance:
+- Render child components via getPConnect().getChildren()
+- Use createComponent() to instantiate each child PConnect
+- Subtype "${compSubtype}" defines the layout pattern
+- Templates control layout and flow, not individual field behavior
+- Handle regions/slots for child placement`;
+  } else if (compType === "Widget") {
+    ctx += `
+
+Widget Component Guidance:
+- Self-contained UI component with its own data fetching
+- Subtype "${compSubtype}" — ${compSubtype === "CASE" ? "operates within a case context" : compSubtype === "PAGE" ? "standalone page-level widget" : "supports both page and case contexts"}
+- Can use getActionsApi() for navigation and case operations
+- May manage its own state independently of parent templates`;
+  }
 
   return ctx;
 }
@@ -508,6 +686,10 @@ export async function POST(
 
   const constellationAddendum =
     project?.type === "COMPONENT" ? CONSTELLATION_ADDENDUM : "";
+  const componentAddendum =
+    project?.type === "COMPONENT"
+      ? buildComponentContext(project.metadata as Record<string, unknown> | null)
+      : "";
   const storybookAddendum =
     hasGithubTools && project?.type === "COMPONENT" ? STORYBOOK_ADDENDUM : "";
   const applicationAddendum =
@@ -515,7 +697,7 @@ export async function POST(
       ? buildApplicationContext(project.metadata as Record<string, unknown> | null)
       : "";
   const systemPrompt =
-    SYSTEM_PROMPT + projectContext + constellationAddendum + applicationAddendum + (hasGithubTools ? TOOLS_ADDENDUM : "") + storybookAddendum;
+    SYSTEM_PROMPT + projectContext + constellationAddendum + componentAddendum + applicationAddendum + (hasGithubTools ? TOOLS_ADDENDUM : "") + storybookAddendum;
 
   const tools = hasGithubTools ? getFileTools() : undefined;
 

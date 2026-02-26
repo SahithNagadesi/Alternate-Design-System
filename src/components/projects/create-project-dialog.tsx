@@ -20,8 +20,22 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { Github, FolderGit2, Loader2, RefreshCw } from "lucide-react";
+import { Github, FolderGit2, Loader2, RefreshCw, ChevronDown } from "lucide-react";
+
+const COMPONENT_SUBTYPES: Record<string, string[]> = {
+  Field: [
+    "Text", "TextInput", "Integer", "Decimal", "Currency", "Percentage",
+    "Boolean", "Date", "DateTime", "TimeOfDay", "Email", "Phone", "URL",
+    "Picklist", "RadioButtons", "TextArea", "RichText", "Checkbox",
+    "AutoComplete", "Attachment",
+  ],
+  Template: [
+    "FORM", "PAGE", "DETAILS", "DASHBOARD", "TAB", "LIST", "DATAVIEW", "OBJECTVIEW",
+  ],
+  Widget: ["CASE", "PAGE", "PAGE & CASE"],
+};
 
 interface GitHubRepo {
   fullName: string;
@@ -63,6 +77,37 @@ export function CreateProjectDialog({
   const [dxApiVersion, setDxApiVersion] = useState("24.1");
   const [dxApiAuthMethod, setDxApiAuthMethod] = useState("Basic");
   const [dxApiEndpoints, setDxApiEndpoints] = useState("");
+
+  // Component metadata state
+  const [organizationName, setOrganizationName] = useState("");
+  const [libraryName, setLibraryName] = useState("");
+  const [componentName, setComponentName] = useState("");
+  const [componentVersion, setComponentVersion] = useState("01.01.01");
+  const [projectDescription, setProjectDescription] = useState("");
+  const [componentType, setComponentType] = useState("Field");
+  const [componentSubtype, setComponentSubtype] = useState("TextInput");
+  const [dxcbVersion, setDxcbVersion] = useState("25.1.10");
+  const [pegaPlatformVersion, setPegaPlatformVersion] = useState("25");
+  const [libraryMode, setLibraryMode] = useState(true);
+  const [rulesetName, setRulesetName] = useState("");
+  const [rulesetVersion, setRulesetVersion] = useState("");
+  const [oauthGrantType, setOauthGrantType] = useState("");
+  const [clientId, setClientId] = useState("");
+  const [showAdvanced, setShowAdvanced] = useState(false);
+
+  // Reset subtype when type changes
+  useEffect(() => {
+    const subtypes = COMPONENT_SUBTYPES[componentType] || [];
+    setComponentSubtype(subtypes[0] || "");
+  }, [componentType]);
+
+  // Auto-derive library mode from DXCB + platform version
+  useEffect(() => {
+    const majorPlatform = parseFloat(pegaPlatformVersion);
+    const majorDxcb = parseFloat(dxcbVersion);
+    // Library mode is default for Pega '25+ and DXCB 25+
+    setLibraryMode(majorPlatform >= 25 || majorDxcb >= 25);
+  }, [dxcbVersion, pegaPlatformVersion]);
 
   // GitHub state
   const [repos, setRepos] = useState<GitHubRepo[]>([]);
@@ -155,6 +200,21 @@ export function CreateProjectDialog({
         dxApiVersion,
         dxApiAuthMethod,
         dxApiEndpoints: dxApiEndpoints.trim() || undefined,
+      } : type === "COMPONENT" ? {
+        organizationName: organizationName.trim(),
+        libraryName: libraryName.trim(),
+        componentName: componentName.trim(),
+        componentVersion,
+        projectDescription: projectDescription.trim() || undefined,
+        componentType,
+        componentSubtype,
+        dxcbVersion,
+        pegaPlatformVersion,
+        libraryMode,
+        rulesetName: rulesetName.trim() || undefined,
+        rulesetVersion: rulesetVersion.trim() || undefined,
+        oauthGrantType: oauthGrantType || undefined,
+        clientId: clientId.trim() || undefined,
       } : undefined;
 
       const res = await fetch("/api/projects", {
@@ -192,6 +252,21 @@ export function CreateProjectDialog({
       setDxApiVersion("24.1");
       setDxApiAuthMethod("Basic");
       setDxApiEndpoints("");
+      setOrganizationName("");
+      setLibraryName("");
+      setComponentName("");
+      setComponentVersion("01.01.01");
+      setProjectDescription("");
+      setComponentType("Field");
+      setComponentSubtype("TextInput");
+      setDxcbVersion("25.1.10");
+      setPegaPlatformVersion("25");
+      setLibraryMode(true);
+      setRulesetName("");
+      setRulesetVersion("");
+      setOauthGrantType("");
+      setClientId("");
+      setShowAdvanced(false);
       onCreated();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to create project");
@@ -323,6 +398,208 @@ export function CreateProjectDialog({
                   rows={2}
                 />
               </div>
+            </div>
+          )}
+
+          {/* Component Metadata Fields */}
+          {type === "COMPONENT" && (
+            <div className="space-y-3 rounded-md border p-3">
+              <p className="text-sm font-medium">Component Configuration</p>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div className="space-y-2">
+                  <Label htmlFor="org-name">Organization *</Label>
+                  <Input
+                    id="org-name"
+                    placeholder="e.g. MyOrg"
+                    value={organizationName}
+                    onChange={(e) => setOrganizationName(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="lib-name">Library *</Label>
+                  <Input
+                    id="lib-name"
+                    placeholder="e.g. MyLib"
+                    value={libraryName}
+                    onChange={(e) => setLibraryName(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="comp-name">Component *</Label>
+                  <Input
+                    id="comp-name"
+                    placeholder="e.g. MyField"
+                    value={componentName}
+                    onChange={(e) => setComponentName(e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
+
+              {organizationName && libraryName && componentName && (
+                <p className="text-xs text-muted-foreground">
+                  Full Key: <code className="bg-muted px-1 rounded">{organizationName}_{libraryName}_{componentName}</code>
+                </p>
+              )}
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label htmlFor="comp-version">Version</Label>
+                  <Input
+                    id="comp-version"
+                    placeholder="01.01.01"
+                    value={componentVersion}
+                    onChange={(e) => setComponentVersion(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="comp-desc">Description</Label>
+                  <Input
+                    id="comp-desc"
+                    placeholder="Optional description"
+                    value={projectDescription}
+                    onChange={(e) => setProjectDescription(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label htmlFor="comp-type">Component Type *</Label>
+                  <Select value={componentType} onValueChange={setComponentType}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Field">Field</SelectItem>
+                      <SelectItem value="Template">Template</SelectItem>
+                      <SelectItem value="Widget">Widget</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="comp-subtype">Subtype *</Label>
+                  <Select value={componentSubtype} onValueChange={setComponentSubtype}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(COMPONENT_SUBTYPES[componentType] || []).map((sub) => (
+                        <SelectItem key={sub} value={sub}>
+                          {sub}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label htmlFor="dxcb-version">DXCB Version</Label>
+                  <Select value={dxcbVersion} onValueChange={setDxcbVersion}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="25.1.10">25.1.10</SelectItem>
+                      <SelectItem value="24.2.10">24.2.10</SelectItem>
+                      <SelectItem value="24.1.10">24.1.10</SelectItem>
+                      <SelectItem value="23.1.10">23.1.10</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="platform-version">Pega Platform</Label>
+                  <Select value={pegaPlatformVersion} onValueChange={setPegaPlatformVersion}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="25">Pega '25</SelectItem>
+                      <SelectItem value="24.2">24.2</SelectItem>
+                      <SelectItem value="24.1">24.1</SelectItem>
+                      <SelectItem value="23.1">23.1</SelectItem>
+                      <SelectItem value="8.8">8.8</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between rounded-md border p-2">
+                <div>
+                  <Label htmlFor="lib-mode" className="text-sm">Library Mode</Label>
+                  <p className="text-xs text-muted-foreground">Default for Pega &apos;25+</p>
+                </div>
+                <Switch
+                  id="lib-mode"
+                  checked={libraryMode}
+                  onCheckedChange={setLibraryMode}
+                />
+              </div>
+
+              {/* Advanced Section */}
+              <button
+                type="button"
+                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                onClick={() => setShowAdvanced(!showAdvanced)}
+              >
+                <ChevronDown className={`h-3 w-3 transition-transform ${showAdvanced ? "rotate-180" : ""}`} />
+                Advanced
+              </button>
+
+              {showAdvanced && (
+                <div className="space-y-3 pt-1">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <Label htmlFor="ruleset-name">Ruleset Name</Label>
+                      <Input
+                        id="ruleset-name"
+                        placeholder="e.g. CustomDXComponents"
+                        value={rulesetName}
+                        onChange={(e) => setRulesetName(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="ruleset-version">Ruleset Version</Label>
+                      <Input
+                        id="ruleset-version"
+                        placeholder="e.g. 01-01-01"
+                        value={rulesetVersion}
+                        onChange={(e) => setRulesetVersion(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <Label htmlFor="oauth-grant">OAuth Grant Type</Label>
+                      <Select value={oauthGrantType || "__none__"} onValueChange={(v) => setOauthGrantType(v === "__none__" ? "" : v)}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="None" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__none__">None</SelectItem>
+                          <SelectItem value="authCode">Authorization Code</SelectItem>
+                          <SelectItem value="passwordCreds">Password Credentials</SelectItem>
+                          <SelectItem value="clientCreds">Client Credentials</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="client-id">Client ID</Label>
+                      <Input
+                        id="client-id"
+                        placeholder="OAuth 2.0 Client ID"
+                        value={clientId}
+                        onChange={(e) => setClientId(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -471,7 +748,12 @@ export function CreateProjectDialog({
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={loading || !name.trim() || (type === "APPLICATION" && !pegaAppName.trim())}>
+            <Button type="submit" disabled={
+              loading ||
+              !name.trim() ||
+              (type === "APPLICATION" && !pegaAppName.trim()) ||
+              (type === "COMPONENT" && (!organizationName.trim() || !libraryName.trim() || !componentName.trim()))
+            }>
               {loading ? "Creating..." : "Create Project"}
             </Button>
           </DialogFooter>

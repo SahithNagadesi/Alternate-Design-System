@@ -10,7 +10,7 @@ import { ChatInterface } from "@/components/chat/chat-interface";
 import { ContextPanel } from "@/components/projects/context-panel";
 import { ProjectSettingsDialog } from "@/components/projects/project-settings-dialog";
 import { PublishDialog } from "@/components/projects/publish-dialog";
-import type { ApplicationMetadata } from "@/types/project-metadata";
+import type { ApplicationMetadata, ComponentMetadata } from "@/types/project-metadata";
 import Link from "next/link";
 
 const ComponentPreview = dynamic(
@@ -27,7 +27,7 @@ interface Project {
   type: "COMPONENT" | "APPLICATION";
   pegaServerUrl: string | null;
   folderPath: string;
-  metadata?: ApplicationMetadata | null;
+  metadata?: ApplicationMetadata | ComponentMetadata | null;
   members: Array<{
     role: string;
     user: { id: string; name: string; email: string };

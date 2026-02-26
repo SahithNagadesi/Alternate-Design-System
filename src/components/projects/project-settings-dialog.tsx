@@ -76,6 +76,8 @@ export function ProjectSettingsDialog({
   const [pegaServerUrl, setPegaServerUrl] = useState(project.pegaServerUrl || "");
   const [pegaUsername, setPegaUsername] = useState("");
   const [pegaPassword, setPegaPassword] = useState("");
+  const [pegaClientId, setPegaClientId] = useState("");
+  const [pegaClientSecret, setPegaClientSecret] = useState("");
   const [loading, setLoading] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
@@ -177,6 +179,8 @@ export function ProjectSettingsDialog({
         body.pegaUsername = pegaUsername;
         body.pegaPassword = pegaPassword;
       }
+      if (pegaClientId) body.pegaClientId = pegaClientId;
+      if (pegaClientSecret) body.pegaClientSecret = pegaClientSecret;
 
       const res = await fetch(`/api/projects/${project.id}`, {
         method: "PATCH",
@@ -189,6 +193,8 @@ export function ProjectSettingsDialog({
       toast.success("Project updated");
       setPegaUsername("");
       setPegaPassword("");
+      setPegaClientId("");
+      setPegaClientSecret("");
       onUpdated();
       onOpenChange(false);
     } catch {
@@ -364,25 +370,52 @@ export function ProjectSettingsDialog({
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-2">
-                    <Label htmlFor="settings-pega-user">Username</Label>
-                    <Input
-                      id="settings-pega-user"
-                      placeholder="Leave blank to keep current"
-                      value={pegaUsername}
-                      onChange={(e) => setPegaUsername(e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="settings-pega-pass">Password</Label>
-                    <Input
-                      id="settings-pega-pass"
-                      type="password"
-                      placeholder="Leave blank to keep current"
-                      value={pegaPassword}
-                      onChange={(e) => setPegaPassword(e.target.value)}
-                    />
-                  </div>
+                  {/* Show OAuth fields or Basic Auth fields based on component metadata */}
+                  {isComponent && compMetadata.oauthGrantType === "clientCreds" ? (
+                    <>
+                      <div className="space-y-2">
+                        <Label htmlFor="settings-pega-client-id">Client ID</Label>
+                        <Input
+                          id="settings-pega-client-id"
+                          placeholder="Leave blank to keep current"
+                          value={pegaClientId}
+                          onChange={(e) => setPegaClientId(e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="settings-pega-client-secret">Client Secret</Label>
+                        <Input
+                          id="settings-pega-client-secret"
+                          type="password"
+                          placeholder="Leave blank to keep current"
+                          value={pegaClientSecret}
+                          onChange={(e) => setPegaClientSecret(e.target.value)}
+                        />
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="space-y-2">
+                        <Label htmlFor="settings-pega-user">Username</Label>
+                        <Input
+                          id="settings-pega-user"
+                          placeholder="Leave blank to keep current"
+                          value={pegaUsername}
+                          onChange={(e) => setPegaUsername(e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="settings-pega-pass">Password</Label>
+                        <Input
+                          id="settings-pega-pass"
+                          type="password"
+                          placeholder="Leave blank to keep current"
+                          value={pegaPassword}
+                          onChange={(e) => setPegaPassword(e.target.value)}
+                        />
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
 

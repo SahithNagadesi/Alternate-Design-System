@@ -23,12 +23,14 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { toast } from "sonner";
+import type { ComponentMetadata, ApplicationMetadata } from "@/types/project-metadata";
 
 interface Project {
   id: string;
   name: string;
   type: "COMPONENT" | "APPLICATION";
   pegaServerUrl: string | null;
+  metadata?: ComponentMetadata | ApplicationMetadata | null;
 }
 
 interface PublishDialogProps {
@@ -90,7 +92,14 @@ export function PublishDialog({
   const [serverUrl, setServerUrl] = useState(project.pegaServerUrl || "");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [clientId, setClientId] = useState("");
+  const [clientSecret, setClientSecret] = useState("");
   const [publishing, setPublishing] = useState(false);
+
+  // Detect OAuth from metadata (only for COMPONENT projects)
+  const useOAuth =
+    project.type === "COMPONENT" &&
+    (project.metadata as ComponentMetadata)?.oauthGrantType === "clientCreds";
 
   // File selection state
   const [files, setFiles] = useState<ProjectFile[]>([]);
@@ -182,8 +191,15 @@ export function PublishDialog({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           pegaServerUrl: serverUrl,
-          pegaUsername: username || undefined,
-          pegaPassword: password || undefined,
+          ...(useOAuth
+            ? {
+                pegaClientId: clientId || undefined,
+                pegaClientSecret: clientSecret || undefined,
+              }
+            : {
+                pegaUsername: username || undefined,
+                pegaPassword: password || undefined,
+              }),
           selectedFiles,
         }),
       });
@@ -247,32 +263,63 @@ export function PublishDialog({
 
               {/* Credentials override */}
               <div className="space-y-3 rounded-md border p-3">
-                <p className="text-sm font-medium">
-                  Credentials{" "}
-                  <span className="text-xs font-normal text-muted-foreground">
-                    (leave blank to use project-level credentials)
-                  </span>
-                </p>
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-medium">
+                    Credentials{" "}
+                    <span className="text-xs font-normal text-muted-foreground">
+                      (leave blank to use project-level credentials)
+                    </span>
+                  </p>
+                  <Badge variant={useOAuth ? "secondary" : "outline"} className="text-xs">
+                    {useOAuth ? "OAuth 2.0" : "Basic Auth"}
+                  </Badge>
+                </div>
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-2">
-                    <Label htmlFor="publish-username">Username</Label>
-                    <Input
-                      id="publish-username"
-                      placeholder="Optional override"
-                      value={username}
-                      onChange={(e) => setUsername(e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="publish-password">Password</Label>
-                    <Input
-                      id="publish-password"
-                      type="password"
-                      placeholder="Optional override"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                    />
-                  </div>
+                  {useOAuth ? (
+                    <>
+                      <div className="space-y-2">
+                        <Label htmlFor="publish-client-id">Client ID</Label>
+                        <Input
+                          id="publish-client-id"
+                          placeholder="Optional override"
+                          value={clientId}
+                          onChange={(e) => setClientId(e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="publish-client-secret">Client Secret</Label>
+                        <Input
+                          id="publish-client-secret"
+                          type="password"
+                          placeholder="Optional override"
+                          value={clientSecret}
+                          onChange={(e) => setClientSecret(e.target.value)}
+                        />
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="space-y-2">
+                        <Label htmlFor="publish-username">Username</Label>
+                        <Input
+                          id="publish-username"
+                          placeholder="Optional override"
+                          value={username}
+                          onChange={(e) => setUsername(e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="publish-password">Password</Label>
+                        <Input
+                          id="publish-password"
+                          type="password"
+                          placeholder="Optional override"
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                        />
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
 

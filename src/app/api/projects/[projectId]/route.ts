@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { encrypt } from "@/lib/encryption";
+import { encrypt, decrypt } from "@/lib/encryption";
+import type { PegaCredentials } from "@/types/project-metadata";
 
 async function verifyMembership(projectId: string, userId: string) {
   const member = await prisma.projectMember.findUnique({
@@ -61,16 +62,42 @@ export async function PATCH(
   }
 
   const body = await req.json();
-  const { name, pegaServerUrl, pegaUsername, pegaPassword, metadata } = body;
+  const { name, pegaServerUrl, pegaUsername, pegaPassword, pegaClientId, pegaClientSecret, metadata } = body;
 
   const updateData: Record<string, unknown> = {};
   if (name) updateData.name = name;
   if (pegaServerUrl !== undefined) updateData.pegaServerUrl = pegaServerUrl || null;
-  if (pegaUsername && pegaPassword) {
-    updateData.pegaCredentials = encrypt(
-      JSON.stringify({ username: pegaUsername, password: pegaPassword })
-    );
+
+  // Handle credential updates with merging
+  if (pegaUsername || pegaPassword || pegaClientId || pegaClientSecret) {
+    // Load existing credentials
+    const existingProject = await prisma.project.findUnique({
+      where: { id: projectId },
+      select: { pegaCredentials: true },
+    });
+
+    let existingCreds: PegaCredentials = {};
+    if (existingProject?.pegaCredentials) {
+      try {
+        const decrypted = decrypt(existingProject.pegaCredentials);
+        existingCreds = JSON.parse(decrypted) as PegaCredentials;
+      } catch {
+        // If decryption fails, start with empty object
+      }
+    }
+
+    // Merge new credentials with existing ones
+    const mergedCreds: PegaCredentials = {
+      ...existingCreds,
+      ...(pegaUsername !== undefined && { username: pegaUsername }),
+      ...(pegaPassword !== undefined && { password: pegaPassword }),
+      ...(pegaClientId !== undefined && { clientId: pegaClientId }),
+      ...(pegaClientSecret !== undefined && { clientSecret: pegaClientSecret }),
+    };
+
+    updateData.pegaCredentials = encrypt(JSON.stringify(mergedCreds));
   }
+
   if (metadata !== undefined) updateData.metadata = metadata;
 
   const project = await prisma.project.update({

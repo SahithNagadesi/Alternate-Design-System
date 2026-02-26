@@ -9,6 +9,7 @@ import {
 } from "@codesandbox/sandpack-react";
 import { RefreshCw, Loader2, Code, Eye, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { getSandpackMockFiles } from "@/lib/sandpack-mocks";
 
 interface ComponentPreviewProps {
   projectId: string;
@@ -132,11 +133,18 @@ export function ComponentPreview({ projectId }: ComponentPreviewProps) {
 
   const entryFile = detectEntryFile(files);
 
-  // Build Sandpack file map
-  const sandpackFileMap: Record<string, { code: string }> = {};
+  // Build Sandpack file map with project files
+  const sandpackFileMap: Record<string, { code: string; hidden?: boolean }> = {};
   for (const [path, code] of Object.entries(files)) {
     sandpackFileMap[path] = { code };
   }
+
+  // Merge in mock modules for Pega-specific dependencies
+  const mockFiles = getSandpackMockFiles();
+  Object.assign(sandpackFileMap, mockFiles);
+
+  // Only show real project files in the visible files list (not mocks)
+  const visibleFiles = Object.keys(files);
 
   return (
     <div className="flex h-full flex-col rounded-xl border bg-card overflow-hidden">
@@ -178,9 +186,16 @@ export function ComponentPreview({ projectId }: ComponentPreviewProps) {
         <SandpackProvider
           template="react-ts"
           files={sandpackFileMap}
+          customSetup={{
+            dependencies: {
+              "styled-components": "^5.3.11",
+              "@pega/cosmos-react-core": "^3.0.0",
+              "@pega/pcore-pconnect-typedefs": "^1.0.0",
+            },
+          }}
           options={{
             activeFile: entryFile,
-            visibleFiles: Object.keys(sandpackFileMap),
+            visibleFiles,
           }}
           theme="auto"
         >

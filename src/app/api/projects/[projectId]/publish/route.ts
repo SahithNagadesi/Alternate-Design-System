@@ -5,7 +5,8 @@ import { prisma } from "@/lib/prisma";
 import { decrypt } from "@/lib/encryption";
 import { getGithubPat } from "@/lib/get-github-pat";
 import { readFile, listFiles, getDefaultBranch } from "@/lib/github-api";
-import { packageComponentZip, publishToPega } from "@/lib/pega-api";
+import { packageComponentZip, publishToPega, obtainOAuthToken } from "@/lib/pega-api";
+import type { PegaCredentials, ComponentMetadata } from "@/types/project-metadata";
 
 const MAX_DEPTH = 3;
 const MAX_FILES = 50;
@@ -76,6 +77,7 @@ export async function POST(
       githubRepo: true,
       pegaServerUrl: true,
       pegaCredentials: true,
+      metadata: true,
     },
   });
   if (!project) {
@@ -93,6 +95,8 @@ export async function POST(
     pegaServerUrl: overrideUrl,
     pegaUsername,
     pegaPassword,
+    pegaClientId,
+    pegaClientSecret,
     selectedFiles,
   } = body;
 
@@ -105,31 +109,55 @@ export async function POST(
     );
   }
 
-  // Resolve credentials — per-publish overrides or project-level
-  let username = pegaUsername;
-  let password = pegaPassword;
+  // Determine auth method from metadata
+  const metadata = project.metadata as ComponentMetadata | null;
+  const useOAuth = metadata?.oauthGrantType === "clientCreds";
 
-  if (!username || !password) {
-    if (project.pegaCredentials) {
-      try {
-        const decrypted = decrypt(project.pegaCredentials);
-        const parsed = JSON.parse(decrypted);
-        username = username || parsed.username;
-        password = password || parsed.password;
-      } catch {
-        return NextResponse.json(
-          { error: "Failed to decrypt stored Pega credentials" },
-          { status: 500 }
-        );
-      }
+  // Resolve stored credentials
+  let storedCreds: PegaCredentials = {};
+  if (project.pegaCredentials) {
+    try {
+      const decrypted = decrypt(project.pegaCredentials);
+      storedCreds = JSON.parse(decrypted) as PegaCredentials;
+    } catch {
+      return NextResponse.json(
+        { error: "Failed to decrypt stored Pega credentials" },
+        { status: 500 }
+      );
     }
   }
 
-  if (!username || !password) {
-    return NextResponse.json(
-      { error: "Pega credentials are required. Provide them or set in project settings." },
-      { status: 400 }
-    );
+  // Resolve credentials based on auth method
+  if (useOAuth) {
+    // OAuth Client Credentials flow
+    const clientId = pegaClientId || storedCreds.clientId;
+    const clientSecret = pegaClientSecret || storedCreds.clientSecret;
+
+    if (!clientId || !clientSecret) {
+      return NextResponse.json(
+        { error: "OAuth Client ID and Client Secret are required. Provide them or set in project settings." },
+        { status: 400 }
+      );
+    }
+
+    // Store for later use
+    storedCreds.clientId = clientId;
+    storedCreds.clientSecret = clientSecret;
+  } else {
+    // Basic Auth
+    const username = pegaUsername || storedCreds.username;
+    const password = pegaPassword || storedCreds.password;
+
+    if (!username || !password) {
+      return NextResponse.json(
+        { error: "Pega credentials are required. Provide them or set in project settings." },
+        { status: 400 }
+      );
+    }
+
+    // Store for later use
+    storedCreds.username = username;
+    storedCreds.password = password;
   }
 
   // Create publish record
@@ -178,13 +206,35 @@ export async function POST(
     // Package ZIP
     const zipBuffer = await packageComponentZip(files, project.name);
 
-    // Publish to Pega
-    const result = await publishToPega(
-      serverUrl,
-      { username, password },
-      zipBuffer,
-      project.name
-    );
+    // Publish to Pega with appropriate auth method
+    let result;
+    if (useOAuth) {
+      // Obtain OAuth token
+      try {
+        const token = await obtainOAuthToken(
+          serverUrl,
+          storedCreds.clientId!,
+          storedCreds.clientSecret!
+        );
+        result = await publishToPega(
+          serverUrl,
+          { method: "bearer", token },
+          zipBuffer,
+          project.name
+        );
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : String(err);
+        throw new Error(`OAuth authentication failed: ${errorMessage}`);
+      }
+    } else {
+      // Use Basic Auth
+      result = await publishToPega(
+        serverUrl,
+        { method: "basic", username: storedCreds.username!, password: storedCreds.password! },
+        zipBuffer,
+        project.name
+      );
+    }
 
     // Update record
     await prisma.publishHistory.update({

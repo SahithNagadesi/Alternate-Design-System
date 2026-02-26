@@ -27,3 +27,10 @@ export interface ComponentMetadata {
   oauthGrantType?: string;
   clientId?: string;
 }
+
+export interface PegaCredentials {
+  username?: string;
+  password?: string;
+  clientId?: string;
+  clientSecret?: string;
+}

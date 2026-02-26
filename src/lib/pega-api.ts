@@ -5,6 +5,61 @@ interface ComponentFile {
   content: string;
 }
 
+type AuthMethod =
+  | { method: "basic"; username: string; password: string }
+  | { method: "bearer"; token: string };
+
+/**
+ * Obtains an OAuth 2.0 access token using Client Credentials flow.
+ *
+ * @param serverUrl - Pega server base URL
+ * @param clientId - OAuth client ID
+ * @param clientSecret - OAuth client secret
+ * @returns Access token string
+ */
+export async function obtainOAuthToken(
+  serverUrl: string,
+  clientId: string,
+  clientSecret: string
+): Promise<string> {
+  const baseUrl = serverUrl.replace(/\/+$/, "");
+  const tokenEndpoint = `${baseUrl}/prweb/PRRestService/oauth2/v1/token`;
+
+  // Client Credentials flow uses Basic Auth with clientId:clientSecret
+  const basicAuth = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
+
+  const response = await fetch(tokenEndpoint, {
+    method: "POST",
+    headers: {
+      Authorization: `Basic ${basicAuth}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: "grant_type=client_credentials",
+  });
+
+  if (!response.ok) {
+    let errorDetail = response.statusText;
+    try {
+      const body = await response.json();
+      errorDetail = body.error_description || body.error || response.statusText;
+    } catch {
+      try {
+        errorDetail = await response.text();
+      } catch {
+        // Keep statusText
+      }
+    }
+    throw new Error(`OAuth token acquisition failed (${response.status}): ${errorDetail}`);
+  }
+
+  const data = await response.json();
+  if (!data.access_token) {
+    throw new Error("OAuth response missing access_token");
+  }
+
+  return data.access_token;
+}
+
 /**
  * Packages component files into a ZIP buffer with an auto-generated
  * component.json manifest if one is not already present.
@@ -57,11 +112,11 @@ export async function packageComponentZip(
  * Publishes a component ZIP to a Pega server using the DX Components API.
  *
  * Endpoint: POST {serverUrl}/prweb/api/v1/components
- * Auth: Basic (username:password)
+ * Auth: Basic (username:password) or Bearer (OAuth token)
  */
 export async function publishToPega(
   serverUrl: string,
-  credentials: { username: string; password: string },
+  auth: AuthMethod,
   zipBuffer: Buffer,
   componentName: string
 ): Promise<{ success: boolean; message: string }> {
@@ -69,14 +124,20 @@ export async function publishToPega(
   const baseUrl = serverUrl.replace(/\/+$/, "");
   const endpoint = `${baseUrl}/prweb/api/v1/components`;
 
-  const basicAuth = Buffer.from(
-    `${credentials.username}:${credentials.password}`
-  ).toString("base64");
+  let authHeader: string;
+  if (auth.method === "basic") {
+    const basicAuth = Buffer.from(
+      `${auth.username}:${auth.password}`
+    ).toString("base64");
+    authHeader = `Basic ${basicAuth}`;
+  } else {
+    authHeader = `Bearer ${auth.token}`;
+  }
 
   const response = await fetch(endpoint, {
     method: "POST",
     headers: {
-      Authorization: `Basic ${basicAuth}`,
+      Authorization: authHeader,
       "Content-Type": "application/zip",
       "Content-Disposition": `attachment; filename="${componentName}.zip"`,
     },

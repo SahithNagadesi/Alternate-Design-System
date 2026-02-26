@@ -13,6 +13,7 @@ import {
   AlertCircle,
   FolderOpen,
   Eye,
+  Image as ImageIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -103,9 +104,21 @@ export function ChatInterface({ projectId, includeContext }: ChatInterfaceProps)
     let content = input.trim();
     if (!content || sending) return;
 
-    if (attachments.length > 0) {
+    // Separate images from text files
+    const imageFiles: File[] = [];
+    const textFiles: File[] = [];
+    for (const file of attachments) {
+      if (file.type.startsWith("image/")) {
+        imageFiles.push(file);
+      } else {
+        textFiles.push(file);
+      }
+    }
+
+    // Read text files as before
+    if (textFiles.length > 0) {
       const fileTexts = await Promise.all(
-        attachments.map(async (file) => {
+        textFiles.map(async (file) => {
           try {
             const text = await file.text();
             return `\n\n--- Attached File: ${file.name} ---\n${text}`;
@@ -115,6 +128,20 @@ export function ChatInterface({ projectId, includeContext }: ChatInterfaceProps)
         })
       );
       content += fileTexts.join("");
+    }
+
+    // Encode images as base64
+    const imageAttachments: { name: string; mediaType: string; base64Data: string }[] = [];
+    for (const img of imageFiles) {
+      const buffer = await img.arrayBuffer();
+      const base64 = btoa(
+        new Uint8Array(buffer).reduce((data, byte) => data + String.fromCharCode(byte), "")
+      );
+      imageAttachments.push({
+        name: img.name,
+        mediaType: img.type,
+        base64Data: base64,
+      });
     }
 
     setInput("");
@@ -143,7 +170,11 @@ export function ChatInterface({ projectId, includeContext }: ChatInterfaceProps)
       const res = await fetch(`/api/projects/${projectId}/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content, includeContext }),
+        body: JSON.stringify({
+          content,
+          includeContext,
+          ...(imageAttachments.length > 0 ? { imageAttachments } : {}),
+        }),
       });
 
       if (!res.ok) {
@@ -259,6 +290,7 @@ export function ChatInterface({ projectId, includeContext }: ChatInterfaceProps)
     if (tool === "write_file") return <FileCode className="h-3 w-3" />;
     if (tool === "read_file") return <Eye className="h-3 w-3" />;
     if (tool === "list_files") return <FolderOpen className="h-3 w-3" />;
+    if (tool === "scaffold_app") return <FolderOpen className="h-3 w-3" />;
     return <FileCode className="h-3 w-3" />;
   }
 
@@ -266,6 +298,7 @@ export function ChatInterface({ projectId, includeContext }: ChatInterfaceProps)
     if (tool === "write_file") return "Writing";
     if (tool === "read_file") return "Reading";
     if (tool === "list_files") return "Listing";
+    if (tool === "scaffold_app") return "Scaffolding";
     return tool;
   }
 
@@ -372,22 +405,44 @@ export function ChatInterface({ projectId, includeContext }: ChatInterfaceProps)
       {/* Attachments Preview */}
       {attachments.length > 0 && (
         <div className="flex flex-wrap gap-2 border-t border-border/50 bg-muted/30 px-4 py-2.5">
-          {attachments.map((file, i) => (
-            <Badge
-              key={i}
-              variant="secondary"
-              className="gap-1.5 pr-1 rounded-full"
-            >
-              <Paperclip className="h-3 w-3 opacity-50" />
-              {file.name}
-              <button
-                onClick={() => removeAttachment(i)}
-                className="ml-0.5 rounded-full p-0.5 transition-colors hover:bg-destructive/20 hover:text-destructive"
+          {attachments.map((file, i) =>
+            file.type.startsWith("image/") ? (
+              <div
+                key={i}
+                className="relative group rounded-lg overflow-hidden border border-border/60 bg-muted/50"
               >
-                <X className="h-3 w-3" />
-              </button>
-            </Badge>
-          ))}
+                <img
+                  src={URL.createObjectURL(file)}
+                  alt={file.name}
+                  className="h-16 w-16 object-cover"
+                />
+                <button
+                  onClick={() => removeAttachment(i)}
+                  className="absolute top-0.5 right-0.5 rounded-full bg-background/80 p-0.5 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-destructive/20 hover:text-destructive"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+                <div className="absolute bottom-0 left-0 right-0 bg-background/70 px-1 py-0.5 text-[9px] truncate">
+                  {file.name}
+                </div>
+              </div>
+            ) : (
+              <Badge
+                key={i}
+                variant="secondary"
+                className="gap-1.5 pr-1 rounded-full"
+              >
+                <Paperclip className="h-3 w-3 opacity-50" />
+                {file.name}
+                <button
+                  onClick={() => removeAttachment(i)}
+                  className="ml-0.5 rounded-full p-0.5 transition-colors hover:bg-destructive/20 hover:text-destructive"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </Badge>
+            )
+          )}
         </div>
       )}
 
@@ -441,7 +496,10 @@ export function ChatInterface({ projectId, includeContext }: ChatInterfaceProps)
           </p>
           <div className="flex items-center gap-2">
             {attachments.length > 0 && (
-              <span className="text-[11px] text-muted-foreground/70">
+              <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground/70">
+                {attachments.some((f) => f.type.startsWith("image/")) && (
+                  <ImageIcon className="h-3 w-3" />
+                )}
                 {attachments.length} file{attachments.length > 1 ? "s" : ""}{" "}
                 attached
               </span>

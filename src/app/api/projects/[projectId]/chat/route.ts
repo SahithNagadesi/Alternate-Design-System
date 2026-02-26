@@ -15,6 +15,12 @@ import {
   listFiles,
   getDefaultBranch,
 } from "@/lib/github-api";
+import {
+  generateADSScaffold,
+  type ScaffoldMetadata,
+} from "@/lib/ads-scaffold";
+import { generateDXCBScaffold } from "@/lib/dxcb-scaffold";
+import type { ComponentMetadata } from "@/types/project-metadata";
 import Anthropic from "@anthropic-ai/sdk";
 
 const MAX_TOOL_ROUNDS = 6;
@@ -46,8 +52,15 @@ const CONSTELLATION_ADDENDUM = `
 IMPORTANT — Pega Constellation DX Component Builder (DXCB) Knowledge:
 
 ## Project Structure
-A DXCB project is scaffolded with \`npx @pega/custom-dx-components create\` and uses tasks.config.json
-for build configuration. Key directories:
+A DXCB project can be scaffolded using the \`scaffold_project\` tool, which creates a complete
+project structure with all necessary configuration files. Alternatively, it can be created with
+\`npx @pega/custom-dx-components create\`. The project uses tasks.config.json for build configuration.
+
+**IMPORTANT**: Use the \`scaffold_project\` tool when the user wants to initialize or bootstrap
+the component project structure. This will create all necessary files including package.json,
+tasks.config.json, TypeScript config, Storybook setup, component source files, styles, and demo stories.
+
+Key directories:
 - src/components/<Org_Lib_CompName>/ — component source
 - src/components/<Org_Lib_CompName>/demo.stories.tsx — Storybook stories
 - tasks.config.json — project-level config (organization, library, version, components list)
@@ -181,8 +194,17 @@ Rules for story files:
 - Export a default meta object with title (use "Components/<ComponentName>") and component reference.
 - Export at least a "Default" story and, where appropriate, additional variants (e.g. Primary, Disabled, WithIcon).
 - Include args/argTypes for the component's main props so they are controllable in Storybook.
+- For components that use PConnect, include a story with a mock getPConnect function in the args.
 - Wrap the component in minimal inline styles or a plain <div> if it needs layout context.
 - Write the story file using the write_file tool just like any other code file.
+
+**IMPORTANT — In-App Preview Mocks:**
+The in-app preview environment has mocked implementations of:
+- @pega/cosmos-react-core — basic HTML-based versions of Cosmos components (Button, Card, Input, Text, etc.)
+- @pega/pcore-pconnect-typedefs — mock getPConnect() with console logging
+- styled-components — simplified styled() proxy
+
+When components use these modules, they will work in the preview with the mock implementations.
 
 Example skeleton:
 \`\`\`tsx
@@ -198,6 +220,17 @@ export default meta;
 type Story = StoryObj<typeof MyComponent>;
 
 export const Default: Story = { args: { label: "Hello" } };
+
+// Example with mock PConnect
+export const WithPConnect: Story = {
+  args: {
+    getPConnect: () => ({
+      getValue: (prop) => '',
+      setValue: (prop, val) => console.log('setValue', prop, val),
+      getConfigProps: () => ({ value: 'testValue' }),
+    }),
+  },
+};
 \`\`\`
 `;
 
@@ -216,8 +249,20 @@ IMPORTANT — When the user asks you to create, write, build, or modify any code
 
 When the user only asks questions or wants explanations (no file changes needed), respond normally in text.`;
 
-function getFileTools(): Anthropic.Tool[] {
-  return [
+const ADS_SCAFFOLD_ADDENDUM = `
+
+You have a scaffold_app tool that generates a complete React + Vite starter project pre-wired with Pega DX API integration.
+
+IMPORTANT — Scaffolding Guidelines:
+- When the user asks you to "scaffold", "bootstrap", "initialize", or "set up" the application, use the scaffold_app tool.
+- The scaffold creates: package.json, tsconfig, vite.config, React entry point, routing, pages (Dashboard, CaseList, CaseDetail, CreateCase), Pega DX API service, auth service, and base styles.
+- After scaffolding, ALWAYS provide the StackBlitz run link so the user can preview the app immediately.
+- You can then use write_file to customize or extend the scaffolded files.
+- If the user asks to add pages, components, or features beyond the scaffold, create them with write_file.
+`;
+
+function getFileTools(projectType?: "APPLICATION" | "COMPONENT"): Anthropic.Tool[] {
+  const tools: Anthropic.Tool[] = [
     {
       name: "read_file",
       description:
@@ -274,6 +319,46 @@ function getFileTools(): Anthropic.Tool[] {
       },
     },
   ];
+
+  if (projectType === "APPLICATION") {
+    tools.push({
+      name: "scaffold_app",
+      description:
+        "Generate a complete React + Vite starter project scaffolded with Pega DX API integration. Creates package.json, routing, pages, DX API service, auth, and styles. Use this when the user wants to bootstrap or initialize the application.",
+      input_schema: {
+        type: "object" as const,
+        properties: {
+          overwrite: {
+            type: "boolean",
+            description:
+              "If true, overwrite existing files. Defaults to false (skip existing files).",
+          },
+        },
+        required: [],
+      },
+    });
+  }
+
+  if (projectType === "COMPONENT") {
+    tools.push({
+      name: "scaffold_project",
+      description:
+        "Generate a complete DXCB (DX Component Builder) project structure for Pega Constellation components. Creates package.json, tasks.config.json, tsconfig.json, Storybook config, component source files, styles, config.json, and demo stories. Use this when the user wants to bootstrap or initialize the component project with proper DXCB structure.",
+      input_schema: {
+        type: "object" as const,
+        properties: {
+          overwrite: {
+            type: "boolean",
+            description:
+              "If true, overwrite existing files. Defaults to false (skip existing files).",
+          },
+        },
+        required: [],
+      },
+    });
+  }
+
+  return tools;
 }
 
 function buildApplicationContext(metadata: Record<string, unknown> | null): string {
@@ -393,14 +478,22 @@ interface FileOperation {
   path: string;
 }
 
+interface ToolContext {
+  pat: string;
+  repo: string;
+  projectFolder: string;
+  branch: string;
+  projectName?: string;
+  pegaServerUrl?: string;
+  metadata?: Record<string, unknown> | null;
+}
+
 async function executeTool(
   toolName: string,
   input: Record<string, unknown>,
-  pat: string,
-  repo: string,
-  projectFolder: string,
-  branch: string
+  ctx: ToolContext
 ): Promise<{ result: string; operation?: FileOperation }> {
+  const { pat, repo, projectFolder, branch } = ctx;
   const relativePath = (input.path as string) || "";
   const fullPath = relativePath
     ? `${projectFolder}/${relativePath}`.replace(/\/\//g, "/")
@@ -447,6 +540,110 @@ async function executeTool(
         )
         .join("\n");
       return { result: listing };
+    }
+
+    case "scaffold_app": {
+      const meta = ctx.metadata || {};
+      const scaffoldMeta: ScaffoldMetadata = {
+        appName: ctx.projectName || "ads-app",
+        pegaAppName: (meta.pegaAppName as string) || undefined,
+        caseTypes: (meta.caseTypes as string) || undefined,
+        dxApiVersion: (meta.dxApiVersion as string) || undefined,
+        authMethod: (meta.dxApiAuthMethod as string) || undefined,
+        framework: (meta.frontendFramework as string) || undefined,
+      };
+
+      const overwrite = input.overwrite === true;
+      const files = generateADSScaffold(scaffoldMeta, ctx.pegaServerUrl || undefined);
+
+      let created = 0;
+      let skipped = 0;
+      const createdFiles: string[] = [];
+
+      for (const file of files) {
+        const filePath = projectFolder
+          ? `${projectFolder}/${file.path}`.replace(/\/\//g, "/")
+          : file.path;
+
+        if (!overwrite) {
+          try {
+            await readFile(pat, repo, filePath, branch);
+            skipped++;
+            continue;
+          } catch {
+            // File doesn't exist — proceed
+          }
+        }
+
+        await writeFile(
+          pat,
+          repo,
+          filePath,
+          file.content,
+          `Scaffold: ${file.path} via Frontier XD`,
+          branch
+        );
+        created++;
+        createdFiles.push(file.path);
+      }
+
+      const stackblitzUrl = `https://stackblitz.com/github/${repo}/tree/${branch}/${projectFolder}`;
+      const result = `Scaffolded ${created} files (${skipped} skipped).\n\nFiles created:\n${createdFiles.map((f) => `- ${f}`).join("\n")}\n\nRun the app: ${stackblitzUrl}`;
+
+      return {
+        result,
+        operation: { action: "scaffolded", path: projectFolder },
+      };
+    }
+
+    case "scaffold_project": {
+      const metadata = ctx.metadata as ComponentMetadata | null;
+      if (!metadata?.organizationName || !metadata?.libraryName || !metadata?.componentName) {
+        return {
+          result: "ERROR: Component metadata incomplete. Organization, Library, and Component names are required. Please configure them in project settings first.",
+        };
+      }
+
+      const overwrite = input.overwrite === true;
+      const files = generateDXCBScaffold(metadata);
+
+      let created = 0;
+      let skipped = 0;
+      const createdFiles: string[] = [];
+
+      for (const file of files) {
+        const filePath = projectFolder
+          ? `${projectFolder}/${file.path}`.replace(/\/\//g, "/")
+          : file.path;
+
+        if (!overwrite) {
+          try {
+            await readFile(pat, repo, filePath, branch);
+            skipped++;
+            continue;
+          } catch {
+            // File doesn't exist — proceed
+          }
+        }
+
+        await writeFile(
+          pat,
+          repo,
+          filePath,
+          file.content,
+          `Scaffold: ${file.path} via Frontier XD`,
+          branch
+        );
+        created++;
+        createdFiles.push(file.path);
+      }
+
+      const result = `Successfully scaffolded DXCB component project!\n\nCreated: ${created} files\nSkipped: ${skipped} files\n\nGenerated files:\n${createdFiles.map((f) => `- ${f}`).join("\n")}\n\nNext steps:\n1. Run \`npm install\` to install dependencies\n2. Run \`npm run build\` to build the component\n3. Run \`npm run storybook\` to start Storybook for local development`;
+
+      return {
+        result,
+        operation: { action: "scaffolded", path: projectFolder },
+      };
     }
 
     default:
@@ -517,7 +714,7 @@ export async function POST(
   }
 
   const body = await req.json();
-  const { content, includeContext } = body;
+  const { content, includeContext, imageAttachments } = body;
 
   if (!content?.trim()) {
     return NextResponse.json(
@@ -526,15 +723,27 @@ export async function POST(
     );
   }
 
-  // Save user message
+  // Build image info note for DB persistence (images are transient)
+  const imageNames: string[] = [];
+  if (Array.isArray(imageAttachments) && imageAttachments.length > 0) {
+    for (const img of imageAttachments) {
+      if (img.name) imageNames.push(img.name);
+    }
+  }
+  const imageNote =
+    imageNames.length > 0
+      ? `\n\n[Attached images: ${imageNames.join(", ")}]`
+      : "";
+
+  // Save user message (text only, images are transient)
   const userMessage = await prisma.chatMessage.create({
-    data: { projectId, role: "USER", content },
+    data: { projectId, role: "USER", content: content + imageNote },
   });
 
   // Project info
   const project = await prisma.project.findUnique({
     where: { id: projectId },
-    select: { name: true, type: true, folderPath: true, githubRepo: true, metadata: true },
+    select: { name: true, type: true, folderPath: true, githubRepo: true, pegaServerUrl: true, metadata: true },
   });
 
   // Context documents (project-level + linked folders)
@@ -618,8 +827,34 @@ export async function POST(
       content: m.content,
     }));
 
-  const currentContent = contextText ? `${content}\n${contextText}` : content;
-  chatMessages.push({ role: "user", content: currentContent });
+  // Build the current user message — multimodal if images are attached
+  const currentText = contextText ? `${content}\n${contextText}` : content;
+  const hasImages = Array.isArray(imageAttachments) && imageAttachments.length > 0;
+
+  if (hasImages) {
+    const contentBlocks: Anthropic.ContentBlockParam[] = [];
+
+    // Add image blocks first
+    for (const img of imageAttachments) {
+      if (img.base64Data && img.mediaType) {
+        contentBlocks.push({
+          type: "image",
+          source: {
+            type: "base64",
+            media_type: img.mediaType as "image/jpeg" | "image/png" | "image/gif" | "image/webp",
+            data: img.base64Data,
+          },
+        });
+      }
+    }
+
+    // Add text block
+    contentBlocks.push({ type: "text", text: currentText });
+
+    chatMessages.push({ role: "user", content: contentBlocks });
+  } else {
+    chatMessages.push({ role: "user", content: currentText });
+  }
 
   const projectContext = project
     ? `\nProject: "${project.name}" (${project.type === "COMPONENT" ? "Pega Constellation Custom Component" : "Alternate Design System"})\nFolder: ${project.folderPath}`
@@ -684,22 +919,23 @@ export async function POST(
   const isCodeRequest = /\b(create|build|write|generate|implement|add|make|update|modify|refactor|fix)\b/i.test(content) || content.length > 200;
   const maxTokens = isCodeRequest ? 8192 : 2048;
 
-  const constellationAddendum =
-    project?.type === "COMPONENT" ? CONSTELLATION_ADDENDUM : "";
-  const componentAddendum =
-    project?.type === "COMPONENT"
-      ? buildComponentContext(project.metadata as Record<string, unknown> | null)
-      : "";
+  const isApplication = project?.type === "APPLICATION";
+  const isComponent = project?.type === "COMPONENT";
+  const constellationAddendum = isComponent ? CONSTELLATION_ADDENDUM : "";
+  const componentAddendum = isComponent
+    ? buildComponentContext(project.metadata as Record<string, unknown> | null)
+    : "";
   const storybookAddendum =
-    hasGithubTools && project?.type === "COMPONENT" ? STORYBOOK_ADDENDUM : "";
-  const applicationAddendum =
-    project?.type === "APPLICATION"
-      ? buildApplicationContext(project.metadata as Record<string, unknown> | null)
-      : "";
+    hasGithubTools && isComponent ? STORYBOOK_ADDENDUM : "";
+  const applicationAddendum = isApplication
+    ? buildApplicationContext(project.metadata as Record<string, unknown> | null)
+    : "";
+  const scaffoldAddendum =
+    hasGithubTools && isApplication ? ADS_SCAFFOLD_ADDENDUM : "";
   const systemPrompt =
-    SYSTEM_PROMPT + projectContext + constellationAddendum + componentAddendum + applicationAddendum + (hasGithubTools ? TOOLS_ADDENDUM : "") + storybookAddendum;
+    SYSTEM_PROMPT + projectContext + constellationAddendum + componentAddendum + applicationAddendum + (hasGithubTools ? TOOLS_ADDENDUM : "") + storybookAddendum + scaffoldAddendum;
 
-  const tools = hasGithubTools ? getFileTools() : undefined;
+  const tools = hasGithubTools ? getFileTools(project?.type) : undefined;
 
   // Helper: call the Anthropic API. Tries streaming first; if the provider
   // returns a permission / auth error we retry with non-streaming (some
@@ -868,10 +1104,15 @@ export async function POST(
                 const { result, operation } = await executeTool(
                   block.name,
                   input,
-                  githubPat!,
-                  githubRepo!,
-                  projectFolder,
-                  defaultBranch
+                  {
+                    pat: githubPat!,
+                    repo: githubRepo!,
+                    projectFolder,
+                    branch: defaultBranch,
+                    projectName: project?.name,
+                    pegaServerUrl: project?.pegaServerUrl || undefined,
+                    metadata: project?.metadata as Record<string, unknown> | null,
+                  }
                 );
 
                 if (operation) fileOps.push(operation);

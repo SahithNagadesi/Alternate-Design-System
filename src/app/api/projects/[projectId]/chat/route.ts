@@ -1000,25 +1000,67 @@ export async function POST(
     }
 
     // --- Attempt 2: non-streaming, without tools ---
-    const finalMsg = await anthropic.messages.create({
-      model,
-      max_tokens: maxTokens,
-      system: systemPrompt,
-      messages: msgs,
-    });
+    try {
+      const finalMsg = await anthropic.messages.create({
+        model,
+        max_tokens: maxTokens,
+        system: systemPrompt,
+        messages: msgs,
+      });
 
-    // Emit the full text at once as a delta so the client still works
-    for (const block of finalMsg.content) {
-      if (block.type === "text" && block.text) {
-        controller.enqueue(
-          encoder.encode(
-            `data: ${JSON.stringify({ type: "delta", text: block.text })}\n\n`
-          )
-        );
+      // Emit the full text at once as a delta so the client still works
+      for (const block of finalMsg.content) {
+        if (block.type === "text" && block.text) {
+          controller.enqueue(
+            encoder.encode(
+              `data: ${JSON.stringify({ type: "delta", text: block.text })}\n\n`
+            )
+          );
+        }
       }
-    }
 
-    return { finalMsg, streamed: false };
+      return { finalMsg, streamed: false };
+    } catch (nonStreamErr) {
+      // If still failing (Bedrock models sometimes need lower limits), try with minimal config
+      const isRetryable =
+        nonStreamErr instanceof Anthropic.PermissionDeniedError ||
+        nonStreamErr instanceof Anthropic.AuthenticationError ||
+        (nonStreamErr instanceof Anthropic.APIError &&
+          (nonStreamErr.status === 403 || nonStreamErr.status === 400 || nonStreamErr.status === 401));
+
+      if (!isRetryable) throw nonStreamErr;
+
+      console.warn(
+        "Non-streaming request also failed, retrying with minimal config:",
+        nonStreamErr instanceof Error ? nonStreamErr.message : nonStreamErr,
+        "Model:",
+        model
+      );
+
+      // --- Attempt 3: minimal config (shorter prompt, lower tokens) ---
+      const minimalSystemPrompt = `You are Frontier XD, an AI assistant specialized in Pega UI development. Provide helpful, concise responses about Pega components and design systems.`;
+      const minimalMaxTokens = 2048; // Lower limit for Bedrock compatibility
+
+      const finalMsg = await anthropic.messages.create({
+        model,
+        max_tokens: minimalMaxTokens,
+        system: minimalSystemPrompt,
+        messages: msgs,
+      });
+
+      // Emit the full text
+      for (const block of finalMsg.content) {
+        if (block.type === "text" && block.text) {
+          controller.enqueue(
+            encoder.encode(
+              `data: ${JSON.stringify({ type: "delta", text: block.text })}\n\n`
+            )
+          );
+        }
+      }
+
+      return { finalMsg, streamed: false };
+    }
   }
 
   try {

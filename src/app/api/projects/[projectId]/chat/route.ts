@@ -916,8 +916,12 @@ export async function POST(
   const hasGithubTools = !!(githubPat && githubRepo);
 
   // Dynamic max_tokens: short questions get fewer tokens, code generation gets full budget
+  // Bedrock models have lower max_tokens limits - use 4096 max for Bedrock
+  const isBedrockModel = model.startsWith("bedrock/") || model.startsWith("anthropic.");
   const isCodeRequest = /\b(create|build|write|generate|implement|add|make|update|modify|refactor|fix)\b/i.test(content) || content.length > 200;
-  const maxTokens = isCodeRequest ? 8192 : 2048;
+  const maxTokens = isBedrockModel
+    ? (isCodeRequest ? 4096 : 1024)
+    : (isCodeRequest ? 8192 : 2048);
 
   const isApplication = project?.type === "APPLICATION";
   const isComponent = project?.type === "COMPONENT";
@@ -978,16 +982,20 @@ export async function POST(
     } catch (streamErr) {
       // If the error is permission/auth related, fall back to non-streaming.
       // Otherwise rethrow so the outer handler deals with it.
+      // Bedrock and some proxies don't support streaming or tools - catch broadly
       const isRetryable =
         streamErr instanceof Anthropic.PermissionDeniedError ||
-        streamErr instanceof Anthropic.APIError &&
-          (streamErr.status === 403 || streamErr.status === 400);
+        streamErr instanceof Anthropic.AuthenticationError ||
+        (streamErr instanceof Anthropic.APIError &&
+          (streamErr.status === 403 || streamErr.status === 400 || streamErr.status === 401));
 
       if (!isRetryable) throw streamErr;
 
       console.warn(
         "Streaming request failed, retrying without stream/tools:",
-        streamErr instanceof Error ? streamErr.message : streamErr
+        streamErr instanceof Error ? streamErr.message : streamErr,
+        "Model:",
+        model
       );
     }
 
@@ -1193,7 +1201,7 @@ export async function POST(
             )
           );
         } catch (err: unknown) {
-          console.error("Chat API error:", err);
+          console.error("Chat API error:", err, "Model:", model);
 
           let errorMsg = "Failed to get AI response";
           if (err instanceof Anthropic.AuthenticationError) {
@@ -1203,11 +1211,13 @@ export async function POST(
             errorMsg =
               "API rate limit reached. Please wait a moment and try again.";
           } else if (err instanceof Anthropic.NotFoundError) {
-            errorMsg =
-              "AI model not found. The configured model may be unavailable — check model name in Admin Settings.";
+            errorMsg = isBedrockModel
+              ? `Bedrock model not found: "${model}". Check the model name in Admin Settings. For Bedrock, use format: bedrock/[region].anthropic.model-name`
+              : "AI model not found. The configured model may be unavailable — check model name in Admin Settings.";
           } else if (err instanceof Anthropic.PermissionDeniedError) {
-            errorMsg =
-              "API permission denied. The API key may lack access to the configured model or features. Check Admin Settings.";
+            errorMsg = isBedrockModel
+              ? `Permission denied for Bedrock model "${model}". Verify: (1) Model name format is correct (e.g., bedrock/global.anthropic.claude-sonnet-4-5-20250929-v1:0), (2) Base URL points to your Bedrock proxy, (3) API key has access to this model.`
+              : "API permission denied. The API key may lack access to the configured model or features. Check Admin Settings.";
           } else if (err instanceof Anthropic.APIError) {
             errorMsg = `API error (${err.status}): ${err.message}`;
           } else if (err instanceof Error) {
